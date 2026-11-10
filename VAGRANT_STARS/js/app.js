@@ -7,12 +7,14 @@ import {Scene} from './render.js';
 import {drawHud, drawMap, mapPick} from './hud.js';
 import {StationUI} from './ui.js';
 import {GameAudio} from './audio.js';
+import {pickEnemy} from './selection.js';
 import {World, lookQuat} from './sim/world.js';
 import {newPlayer, sanitizeSave} from './sim/player.js';
 import {BASES} from './sim/data.js';
 
 const SAVE_KEY = 'vagrant-stars.save.v1', SETTINGS_KEY = 'vagrant-stars.settings.v1', STEP = 1 / 60;
 const $ = id => document.getElementById(id);
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const view = $('view'), hud = $('hud'), flash = $('flash'), ctx = hud.getContext('2d');
 const overlays = {menu: $('menu'), help: $('help'), pause: $('pause'), dead: $('dead'), station: $('station'), fail: $('fail')};
 const store = {
@@ -157,8 +159,12 @@ hud.addEventListener('pointermove', e => { cursor = {x: e.clientX, y: e.clientY}
 hud.addEventListener('pointerdown', e => {
   audio.unlock(); cursor = {x: e.clientX, y: e.clientY}; hud.focus({preventScroll: true});
   if (mode === 'map') { const poi = mapPick(hud.clientWidth, hud.clientHeight, world, e.clientX, e.clientY); if (poi) { world.targetPoi(poi.id); audio.play('click', {gain: 0.5}); } return; }
-  if (mode !== 'flight') return;
-  if (e.button === 0) { firing = true; hud.setPointerCapture?.(e.pointerId); } else if (e.button === 2) pendingMissile = true;
+  if (mode !== 'flight' || world.over) return;
+  if (e.button === 0) { firing = true; hud.setPointerCapture?.(e.pointerId); } else if (e.button === 2) {
+    const rect = hud.getBoundingClientRect();
+    const ship = pickEnemy(world, scene, poses, e.clientX - rect.left, e.clientY - rect.top, rect.width, rect.height);
+    if (ship) { world.target = {kind: 'ship', id: ship.id}; audio.play('click', {gain: 0.45}); }
+  }
   e.preventDefault();
 });
 for (const name of ['pointerup', 'pointercancel', 'lostpointercapture']) hud.addEventListener(name, e => { if (name !== 'pointerup' || e.button === 0) firing = false; });
@@ -210,7 +216,14 @@ function frame(now) {
   requestAnimationFrame(frame);
   const seconds = last === null ? 0 : Math.min(0.25, (now - last) / 1000);
   last = now;
-  if (mode === 'docked') { audio.update(false); return; }
+  if (mode === 'docked') {
+    const port = world.sector.byId.get(world.docked), a = 2.2 + (reducedMotion ? 0 : now / 1000 * 0.012), distance = port.radius * 3.8;
+    updatePoses(world, 1);
+    cam.pos = [port.pos[0] + Math.cos(a) * distance, port.pos[1] + distance * 0.2, port.pos[2] + Math.sin(a) * distance];
+    const to = port.pos.map((v, i) => v - cam.pos[i]), len = Math.hypot(...to); cam.q = lookQuat(to.map(v => v / len));
+    scene.draw(world, cam, poses, 0, reducedMotion ? 0 : seconds);
+    audio.update(false, 0, 0, world); return;
+  }
   if (!world) { // title backdrop: a live corner of Meridian
     backdrop ??= (() => { const w = new World(newPlayer(11)); scene.setSystem(w.system); return w; })();
     backdrop.step(Math.min(seconds, 0.05), {}); backdrop.events.length = 0;
@@ -254,11 +267,11 @@ function frame(now) {
   const ui = {cursor, mouseFlight, firing, messages, poses, hint};
   if (mode === 'map') drawMap(ctx, hud.clientWidth, hud.clientHeight, world, ui); else drawHud(ctx, hud.clientWidth, hud.clientHeight, world, scene, ui);
   const power = me.lane ? 3 : me.cruise.state === 'on' ? 2.4 : me.burning ? 1.7 : me.throttle;
-  audio.update(mode === 'flight', power, world.contacts().some(c => c.attitude === 'hostile' && c.dist < 2600) ? 1 : 0);
+  audio.update(mode === 'flight', power, world.contacts().some(c => c.attitude === 'hostile' && c.dist < 2600) ? 1 : 0, world);
 }
 
 refreshMenu(); setMode('menu');
 requestAnimationFrame(frame);
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('../sw.js').catch(() => {});
 // Read-only handle for automated smoke tests and the curious.
-globalThis.__vagrant = {get world() { return world; }, get player() { return player; }, get mode() { return mode; }, scene};
+globalThis.__vagrant = {get world() { return world; }, get player() { return player; }, get mode() { return mode; }, scene, audio};

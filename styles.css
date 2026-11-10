@@ -9,6 +9,12 @@ body { margin:0; min-height:100vh; color:var(--ink); font:16px/1.6 "Segoe UI", s
 h1 { margin:6px 0 10px; font-size:clamp(38px, 8vw, 68px); font-weight:200; letter-spacing:.12em; line-height:1.05; }
 h1 span { font-weight:700; color:var(--accent); }
 .lede { margin:0; max-width:62ch; color:#c4d6ea; }
+.jump { display:flex; flex-wrap:wrap; gap:10px; margin:0 0 18px; }
+.jump a { padding:6px 14px; border:1px solid var(--line); border-radius:999px; text-decoration:none; font-size:13px; letter-spacing:.12em; color:var(--ink); background:rgba(12,22,38,.6); }
+.jump a:hover { border-color:var(--accent); }
+.game + .game { margin-top:22px; }
+.game.amber { --accent:#ffb866; }
+.game.amber .button { background:linear-gradient(180deg, #d68232, #a05418); border-color:rgba(255,200,140,.6); }
 .game { display:grid; grid-template-columns:minmax(0, 1.25fr) minmax(0, 1fr); gap:26px; align-items:center; padding:20px; border:1px solid var(--line); border-radius:16px; background:rgba(12,22,38,.72); }
 .shot { display:block; border-radius:10px; overflow:hidden; border:1px solid var(--line); background:#02050a; }
 .shot img { display:block; width:100%; height:auto; transition:transform .3s; }

@@ -4,10 +4,11 @@
 // transformed and flat-lit on the CPU each frame and streamed into a few dynamic meshes.
 // Distant objects are drawn first in a uniformly shrunken "far" pass (same image, far better
 // depth precision), then the depth buffer is cleared and nearby objects are drawn at 1:1.
+import {Environment, unitCircle} from './environment.js';
 import {Renderer} from '../vendor/vanillajs/modules/render-webgl/index.js';
 import {rotate, perspective, viewMatrix, multiplyMatrices, seededRandom} from '../vendor/vanillajs/modules/math/index.js';
 import {FACTIONS} from './sim/data.js';
-import {shipModel, stationModel, stationLights, planetModel, rockModels, gateModel, laneRingModel, podModel, missileModel} from './sim/models.js';
+import {shipModel, stationModel, stationLights, rockModels, gateModel, laneRingModel, podModel, missileModel} from './sim/models.js';
 
 export const FOV = Math.PI / 2.6;
 const FAR_SCALE = 1 / 130, NEAR_LIMIT = 1150;
@@ -26,7 +27,7 @@ class Stream {
 export class Scene {
   constructor(canvas) {
     const r = this.renderer = new Renderer(canvas);
-    this.gl = r.gl; this.canvas = canvas;
+    this.gl = r.gl; this.canvas = canvas; this.environment = new Environment(r.gl);
     this.far = new Stream(r, 150000); this.near = new Stream(r, 60000);
     this.farGlow = new Stream(r, 30000); this.nearGlow = new Stream(r, 45000); this.lines = new Stream(r, 9000, 'lines');
     this.sky = null; this.fx = []; this.sparks = []; this.trails = new Map();
@@ -51,20 +52,8 @@ export class Scene {
       const b = 0.25 + rng() * rng() * 0.75, hue = rng(), c = hue < 0.2 ? [1, 0.8, 0.6] : hue < 0.4 ? [0.7, 0.8, 1] : [1, 1, 1];
       (b > 0.72 ? big : small).push(d[0] * R, d[1] * R, d[2] * R, c[0] * b, c[1] * b, c[2] * b);
     }
-    const clouds = [];
-    for (let i = 0; i < 16; i++) {
-      const d = dirOnSphere(), col = system.sky[i % system.sky.length].map(v => v * (0.16 + rng() * 0.16)), radius = 240 + rng() * 420;
-      const ref = Math.abs(d[1]) > 0.9 ? [1, 0, 0] : [0, 1, 0];
-      let u = [d[1] * ref[2] - d[2] * ref[1], d[2] * ref[0] - d[0] * ref[2], d[0] * ref[1] - d[1] * ref[0]]; const ul = Math.hypot(...u); u = u.map(v => v / ul);
-      const v = [d[1] * u[2] - d[2] * u[1], d[2] * u[0] - d[0] * u[2], d[0] * u[1] - d[1] * u[0]], c = d.map(x => x * 880), segs = 14;
-      const at = (a, k) => c.map((x, j) => x + (u[j] * Math.cos(a) + v[j] * Math.sin(a)) * radius * k);
-      for (let s = 0; s < segs; s++) {
-        const a = s / segs * Math.PI * 2, b = (s + 1) / segs * Math.PI * 2, mid = col.map(x => x * 0.4);
-        clouds.push(...c, ...col, ...at(a, 0.5), ...mid, ...at(b, 0.5), ...mid);
-        clouds.push(...at(a, 0.5), ...mid, ...at(a, 1), 0, 0, 0, ...at(b, 1), 0, 0, 0, ...at(a, 0.5), ...mid, ...at(b, 1), 0, 0, 0, ...at(b, 0.5), ...mid);
-      }
-    }
-    this.sky = {small: r.mesh(small, 'points'), big: r.mesh(big, 'points'), clouds: r.mesh(clouds)};
+    this.sky = {small: r.mesh(small, 'points'), big: r.mesh(big, 'points')};
+    this.environment.configure(hashText(system.id), system.sky, system.planets);
     this.tint = system.star.color.map(v => 0.55 + v * 0.45);
     this.fx = []; this.sparks = []; this.trails.clear();
   }
@@ -132,8 +121,9 @@ export class Scene {
     if (!stream.room(segs * 3)) return;
     const R = this.right, U = this.up, out = stream.data, r = radius * k, ox = px * k, oy = py * k, oz = pz * k;
     let n = stream.n;
+    const circle = unitCircle(segs);
     for (let i = 0; i < segs; i++) {
-      const a = i / segs * Math.PI * 2, b = (i + 1) / segs * Math.PI * 2, ca = Math.cos(a) * r, sa = Math.sin(a) * r, cb = Math.cos(b) * r, sb = Math.sin(b) * r;
+      const ca = circle[i * 2] * r, sa = circle[i * 2 + 1] * r, cb = circle[i * 2 + 2] * r, sb = circle[i * 2 + 3] * r;
       out[n] = ox; out[n + 1] = oy; out[n + 2] = oz; out[n + 3] = color[0] * core; out[n + 4] = color[1] * core; out[n + 5] = color[2] * core;
       out[n + 6] = ox + R[0] * ca + U[0] * sa; out[n + 7] = oy + R[1] * ca + U[1] * sa; out[n + 8] = oz + R[2] * ca + U[2] * sa; out[n + 9] = 0; out[n + 10] = 0; out[n + 11] = 0;
       out[n + 12] = ox + R[0] * cb + U[0] * sb; out[n + 13] = oy + R[1] * cb + U[1] * sb; out[n + 14] = oz + R[2] * cb + U[2] * sb; out[n + 15] = 0; out[n + 16] = 0; out[n + 17] = 0;
@@ -144,7 +134,7 @@ export class Scene {
   /** Camera-facing additive halo: dark centre, bright band, dark rim. */
   #ring(pos, radius, color, segs = 14) {
     const c = this.cam.pos, ox = pos[0] - c[0], oy = pos[1] - c[1], oz = pos[2] - c[2], stream = this.nearGlow;
-    if (!stream.room(segs * 9) || Math.hypot(ox, oy, oz) + radius > NEAR_LIMIT) return;
+    if (!stream.room(segs * 12) || Math.hypot(ox, oy, oz) + radius > NEAR_LIMIT) return;
     const R = this.right, U = this.up, out = stream.data; let n = stream.n;
     const put = (a, k, lit) => {
       const x = Math.cos(a) * radius * k, y = Math.sin(a) * radius * k;
@@ -154,7 +144,7 @@ export class Scene {
     for (let i = 0; i < segs; i++) {
       const a = i / segs * Math.PI * 2, b = (i + 1) / segs * Math.PI * 2;
       put(a, 0.45, false); put(a, 0.86, true); put(b, 0.86, true); put(a, 0.45, false); put(b, 0.86, true); put(b, 0.45, false);
-      put(a, 0.86, true); put(a, 1, false); put(b, 1, false);
+      put(a, 0.86, true); put(a, 1, false); put(b, 1, false); put(a, 0.86, true); put(b, 1, false); put(b, 0.86, true);
     }
     stream.n = n;
   }
@@ -196,10 +186,6 @@ export class Scene {
     const blink = 0.55 + 0.45 * Math.sin(this.time * 4), t = world.time;
 
     // Planets, star, stations, gates, rings, rocks.
-    for (const p of sys.planets) {
-      const save = this.light, to = [sys.star.pos[0] - p.pos[0], sys.star.pos[1] - p.pos[1], sys.star.pos[2] - p.pos[2]], l = Math.hypot(...to);
-      this.light = to.map(v => v / l); this.#model(planetModel(p.palette), p.pos, IDENTITY, p.radius, 0, true); this.light = save;
-    }
     const sc = sys.star.color;
     this.#disc(sys.star.pos, sys.star.radius * 5.5, sc.map(v => v * 0.5), true, 28);
     this.#disc(sys.star.pos, sys.star.radius * 1.5, [1, 1, 1], true, 28, 2.2);
@@ -216,6 +202,22 @@ export class Scene {
         this.#model(laneRingModel(), poi.pos, poi.lane.q, 1);
         this.#disc(poi.pos, 30, [0.15 * blink, 0.7 * blink, 0.9 * blink]);
       }
+    }
+    // Lit port approaches give nearby stations scale and a clear arrival corridor.
+    for (const port of sector.pois.filter(p => p.type === 'base')) {
+      const d = Math.hypot(...port.pos.map((v, i) => v - cam.pos[i]));
+      if (d > 7000) continue;
+      const radius = port.radius ?? 320;
+      for (let i = 0; i < 7; i++) {
+        const z = port.pos[2] + radius + 100 + i * 90;
+        const pulse = 0.25 + 0.65 * Math.max(0, Math.sin(this.time * 2.8 - i * 0.65));
+        for (const side of [-1, 1]) {
+          const pos = [port.pos[0] + side * 70, port.pos[1] - 25, z];
+          this.#disc(pos, 7, [0.12 * pulse, 0.65 * pulse, pulse], null, 8);
+        }
+      }
+      const beacon = [port.pos[0], port.pos[1] + radius * 0.6, port.pos[2]];
+      this.#disc(beacon, 32, [0.55, 0.18, 0.035].map(v => v * (0.5 + 0.5 * Math.sin(this.time * 1.8))));
     }
     // OPT-REDUCE-001: cull rocks by distance before any vertex work, and thin distant ones.
     const rocks = rockModels(1), rocksFar = rockModels(0), cp = cam.pos;
@@ -295,10 +297,13 @@ export class Scene {
     // Draw passes.
     r.begin([0, 0, 0], cam.q, {fog: haze * 0.0028});
     this.vp = multiplyMatrices(perspective(FOV, this.canvas.width / this.canvas.height), viewMatrix([0, 0, 0], cam.q));
-    gl.depthMask(false); gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);
-    r.draw(this.sky.clouds); r.draw(this.sky.small);
+    gl.depthMask(false);
+    this.environment.drawSky(this.vp); gl.useProgram(r.program);
+    gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);
+    r.draw(this.sky.small);
     gl.uniform1f(r.pointSize, Math.max(2, (globalThis.devicePixelRatio || 1) * 2.4)); r.draw(this.sky.big);
     gl.disable(gl.BLEND); gl.depthMask(true);
+    this.environment.drawPlanets(this.vp, sys.planets, cam, sys.star, FAR_SCALE); gl.useProgram(r.program);
     gl.uniform1f(r.fog, fogNear / FAR_SCALE); this.far.flush();
     gl.depthMask(false); gl.enable(gl.BLEND); gl.uniform1f(r.fog, 0); this.farGlow.flush();
     gl.disable(gl.BLEND); gl.depthMask(true); gl.clear(gl.DEPTH_BUFFER_BIT);
@@ -307,5 +312,5 @@ export class Scene {
     gl.disable(gl.BLEND); gl.depthMask(true);
     return haze;
   }
-  dispose() { this.renderer.dispose(); }
+  dispose() { this.environment.dispose(); this.renderer.dispose(); }
 }

@@ -29,15 +29,15 @@ try {
       credits: g.player?.credits, cargo: g.player?.cargo, drawn: g.scene.far.n + g.scene.near.n};
   });
   const until = async (label, check, seconds = 40) => {
-    for (let i = 0; i < seconds * 5; i++) { const state = await game(); if (check(state)) return state; await page.waitForTimeout(200); }
+    for (let i = 0; i < seconds * 5; i++) { const state = await game(); if (await check(state)) return state; await page.waitForTimeout(200); }
     assert.fail(`timed out waiting for: ${label} (${JSON.stringify(await game())})`);
   };
 
   // Collection page -> game.
   await page.goto(home);
   assert.match(await page.title(), /OFFLINE GAMES/);
-  assert.ok(await page.locator('.shot img').evaluate(img => img.complete && img.naturalWidth > 0), 'the screenshot loads');
-  await page.click('a.button');
+  assert.ok(await page.locator('#vagrant-stars .shot img').evaluate(img => img.complete && img.naturalWidth > 0), 'the screenshot loads');
+  await page.click('a.button[href="VAGRANT_STARS/"]');
   await page.waitForSelector('#btn-new');
   await page.waitForTimeout(600);
   assert.ok((await game()).drawn > 0, 'the title backdrop is rendering');

@@ -9,7 +9,9 @@ import {fileURLToPath} from 'node:url';
 
 export const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const TOP = ['index.html', 'styles.css', 'manifest.webmanifest', 'sw.js', '.nojekyll', 'LICENSE', 'NOTICE', 'assets'];
-const GAMES = {VAGRANT_STARS: ['index.html', 'style.css', 'README.md', 'NOTICE.md', 'js', 'vendor']};
+const GAME_FILES = ['index.html', 'style.css', 'README.md', 'NOTICE.md', 'js', 'vendor'];
+/** Every game published on the site. Add a folder here to ship it; the tests insist the landing page links to it. */
+export const GAMES = {VAGRANT_STARS: GAME_FILES, IRONWAKE: GAME_FILES};
 
 async function walk(path) {
   const entries = await readdir(join(root, path), {withFileTypes: true}).catch(() => null);

@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IRONWAKE — broadside captaincy</title>
+<meta name="description" content="Command a warship on the battle plane: steady your broadside, raise the deflector, trade, mine and hunt the Most Wanted. An original game on pure web standards, built with the VANILLAJS engine.">
+<meta name="theme-color" content="#050a12">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="view" aria-label="Battle view"></canvas>
+<canvas id="hud" tabindex="0" aria-label="Bridge display. Mouse looks, keyboard sails."></canvas>
+<div id="flash" aria-hidden="true"></div>
+
+<section id="menu" class="overlay">
+  <div class="menu-card">
+    <p class="kicker">QSOL-IMC · OFFLINE GAMES</p>
+    <h1>IRON<span>WAKE</span></h1>
+    <p class="tagline">Run out the guns. Bring her about. Fire as you bear.</p>
+    <div class="menu-buttons">
+      <button id="btn-continue" class="primary" hidden>Continue</button>
+      <button id="btn-new" class="primary">New captain</button>
+      <button id="btn-help">How to fight</button>
+    </div>
+    <p class="small">Mouse and keyboard. Runs offline once loaded. Progress is saved in this browser.</p>
+    <p class="small"><a href="../">◂ All offline games</a></p>
+  </div>
+</section>
+
+<section id="help" class="overlay" hidden>
+  <div class="panel">
+    <h2>How to fight</h2>
+    <div class="keys">
+      <div><h3>Helm</h3><ul>
+        <li><kbd>Mouse</kbd> look around your ship (click the view to capture it; arrow keys also work)</li>
+        <li><kbd>W</kbd> <kbd>S</kbd> throttle · <kbd>A</kbd> <kbd>D</kbd> rudder</li>
+        <li><kbd>Shift</kbd> boost (hold)</li>
+        <li><kbd>N</kbd> plot a course · <kbd>J</kbd> warp drive</li>
+        <li><kbd>F</kbd> dock when close and slow</li>
+        <li><kbd>M</kbd> sector chart · <kbd>Esc</kbd> pause</li>
+      </ul></div>
+      <div><h3>Gunnery</h3><ul>
+        <li>Look to <strong>port or starboard</strong> to pick a broadside</li>
+        <li>Hold <kbd>Left mouse</kbd> or <kbd>Space</kbd> to steady the guns; the fan narrows</li>
+        <li>Release to fire the whole battery</li>
+        <li>Lead a moving ship: aim at the red marker</li>
+        <li>Turrets fire on their own at anything hostile in reach</li>
+        <li><kbd>Right mouse</kbd> select enemy under cursor (centre crosshair while captured)</li>
+        <li><kbd>Q</kbd> torpedo at the selected ship</li>
+      </ul></div>
+      <div><h3>Survival</h3><ul>
+        <li><kbd>E</kbd> raise the deflector: it soaks a salvo, then must recharge</li>
+        <li>You have four shield screens. Turn a fresh one toward the enemy</li>
+        <li><kbd>R</kbd> nearest hostile · <kbd>T</kbd> next ship</li>
+        <li>Broadsides crack small rocks into ore; cargo is tractored in automatically</li>
+      </ul></div>
+    </div>
+    <button class="primary" data-close>Back</button>
+  </div>
+</section>
+
+<section id="pause" class="overlay" hidden>
+  <div class="panel narrow">
+    <h2>Paused</h2>
+    <label>Effects volume <input id="vol-sfx" type="range" min="0" max="1" step="0.05"></label>
+    <label>Music volume <input id="vol-music" type="range" min="0" max="1" step="0.05"></label>
+    <div class="menu-buttons"><button id="btn-resume" class="primary">Resume</button><button id="btn-pause-help">How to fight</button><button id="btn-quit">Quit to title</button></div>
+    <p class="small">Your game is saved each time you dock. Quitting at sea returns you to your last port.</p>
+  </div>
+</section>
+
+<section id="dead" class="overlay" hidden>
+  <div class="panel narrow">
+    <h2 id="dead-title">Ship lost</h2>
+    <p id="dead-text">She goes down with her colours flying.</p>
+    <div class="menu-buttons"><button id="btn-restore" class="primary">Return to last port</button><button id="btn-dead-quit">Quit to title</button></div>
+  </div>
+</section>
+
+<section id="fail" class="overlay" hidden><div class="panel narrow"><h2>Cannot start</h2><p id="fail-text"></p><p class="small"><a href="../">◂ All offline games</a></p></div></section>
+<section id="station" class="overlay station" hidden></section>
+<script type="module" src="js/app.js"></script>
+<noscript><p style="color:#fff;padding:2rem">IRONWAKE needs JavaScript and WebGL.</p></noscript>
+</body>
+</html>

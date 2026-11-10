@@ -10,7 +10,19 @@ connection.
 
 | Game | What it is |
 | --- | --- |
-| [VAGRANT STARS](VAGRANT_STARS/) | 3D open-space trading and combat across six star systems, built on the [VANILLAJS](https://github.com/QSOLKCB/VANILLAJS) engine |
+| [VAGRANT STARS](VAGRANT_STARS/) | 3D open-space trading and combat across six star systems: [play](https://qsolkcb.github.io/OFFLINE-GAMES/VAGRANT_STARS/) |
+| [IRONWAKE](IRONWAKE/) | Capital-ship broadside combat, trading and mining on a battle plane: [play](https://qsolkcb.github.io/OFFLINE-GAMES/IRONWAKE/) |
+
+Both are built on the [VANILLAJS](https://github.com/QSOLKCB/VANILLAJS) engine. Each game is a
+self-contained folder with its own tests and its own pinned copy of the engine modules it uses.
+
+## Presentation and controls
+
+Both games now have procedural nebula skies, textured planets and atmospheres,
+animated port approaches, live dockside views and a fuller stereo soundscape.
+Right-click selects an enemy; Q fires missiles/torpedoes and IRONWAKE uses E for
+its deflector. See [the presentation notes](docs/PRESENTATION.md) for the changes,
+VANILLAJS/OPT provenance, resource bounds and validation commands.
 
 ## Run locally
 
@@ -33,7 +45,8 @@ game in Chromium when Playwright is installed.
 
 ## Deploy to GitHub Pages
 
-`.github/workflows/pages.yml` tests the repository and publishes it.
+`.github/workflows/pages.yml` tests every game and publishes them together as one site:
+the collection page at the root with a Play link to each game, and each game in its own folder.
 
 1. One time: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
 2. Merge to `main`. The workflow runs the tests, stages the site and deploys it.
@@ -52,12 +65,20 @@ branch" mode serves it too, without the test gate.
 | --- | --- |
 | `index.html`, `styles.css` | The collection page |
 | `sw.js`, `manifest.webmanifest`, `assets/` | Offline support and icons |
-| `VAGRANT_STARS/` | The game, its tests and its vendored engine modules |
+| `VAGRANT_STARS/`, `IRONWAKE/` | One folder per game: the game, its tests and its vendored engine modules |
 | `scripts/site.mjs` | The published file list: stages the Pages artifact and keeps `sw.js` in step |
 | `scripts/serve.mjs` | Local static server |
 | `tests/` | Site-level tests |
 
 After adding or removing a published file, run `node scripts/site.mjs sync-sw`.
+
+## Adding a game
+
+1. Put it in its own folder with `index.html`, `style.css`, `README.md`, `NOTICE.md`, `js/` and `vendor/`.
+2. Add the folder to `GAMES` in `scripts/site.mjs` and run `node scripts/site.mjs sync-sw`.
+3. Add a card with a `Play` link to `index.html`, and its tests to the `test` script in `package.json` and the workflow.
+
+The site tests fail if a published game has no link on the collection page.
 
 ## Licence
 

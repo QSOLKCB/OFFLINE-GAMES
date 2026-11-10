@@ -1,0 +1,47 @@
+{
+  "repository": "https://github.com/QSOLKCB/VANILLAJS",
+  "commit": "6b07c63aca143a34f0d3cf29bb2a7c8bc03e0e5e",
+  "retrieved": "2026-11-10",
+  "modules": [
+    "math",
+    "collision",
+    "flight",
+    "time",
+    "input",
+    "weapons",
+    "adaptive-circles",
+    "range2d",
+    "lead-solver",
+    "render-webgl",
+    "audio2d"
+  ],
+  "localChanges": [],
+  "usedBy": {
+    "math": "vectors, quaternions, camera matrices, seeded randomness",
+    "collision": "AABB sweeps behind flight (stations, rocks, wrecks)",
+    "flight": "every hull's assisted motion, held to the battle plane",
+    "time": "fixed 60 Hz simulation clock",
+    "input": "action state, keyboard lifecycle and pointer-lock mouse look",
+    "weapons": "broadside batteries: ripple fire and reload timing",
+    "adaptive-circles": "every shell's swept hit test against hulls, rocks and stations",
+    "range2d": "turret target range checks",
+    "lead-solver": "turret and NPC gunnery, the HUD lead marker",
+    "render-webgl": "the WebGL renderer",
+    "audio2d": "all baked sound effects"
+  },
+  "sha256": {
+    "LICENSE": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+    "NOTICE": "f2614639df44fb65f6b2c3f9ce4f3f1bcfd1ab703e78ef6304e83d77c8e68c44",
+    "modules/math/index.js": "4f4ebf0786b97342c11004b8830a535890b16693458a0436edb1fc581a411da7",
+    "modules/collision/index.js": "99c0f4bc106d4162fc5bea057a7108d7cf52526279b2a8ad4e4f27c1f0e6f5c1",
+    "modules/flight/index.js": "da9d416b5148a61bdad9ec46e499a62428eb96a091be4ff40248f3bb3cb9dcc6",
+    "modules/time/index.js": "de94c0bc04e6a269504c5742455ce114f824c2c0d9d59a2fd94555df5d9bb4a2",
+    "modules/input/index.js": "e157c0eaee89ea240fa0abe43ca24d02620c917f3188f75dcc4d765392eca025",
+    "modules/weapons/index.js": "f8fd92fbf0fc3bc3a174e12f5e61df2e1484ff0a070ec5165106f61b3340cf83",
+    "modules/adaptive-circles/index.js": "47333bd2221ca928a594d5f66e01e4482d23c69c4c722243a782078f3dd99f03",
+    "modules/range2d/index.js": "a57f4c97337f124c5783bb8070845513ebab60ae479a46e875ad10adf07d3475",
+    "modules/lead-solver/index.js": "e0ed0b67ebbf972f4e1bcf900f24cf56048252bc853073ed0f89cc7328bb06c1",
+    "modules/render-webgl/index.js": "af088cc5c4456ee07908d1561327c37c11d5c168b7d1b2c366149883f070e87c",
+    "modules/audio2d/index.js": "07e19391b84034acba56ef840a4d622b70e815f5376de123b6a07a9ccebf3098"
+  }
+}
