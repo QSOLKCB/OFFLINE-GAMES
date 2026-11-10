@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OFFLINE GAMES — a collection of gaming experiences</title>
+<meta name="description" content="Original browser games on pure web standards. No accounts, no trackers, no downloads: they keep working without a connection.">
+<meta name="theme-color" content="#050a12">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="masthead">
+  <p class="kicker">QSOL-IMC</p>
+  <h1>OFFLINE <span>GAMES</span></h1>
+  <p class="lede">A collection of gaming experiences on pure web standards. No accounts, no trackers, no installs. Once a game has loaded, it keeps working without a connection.</p>
+</header>
+<main>
+  <article class="game">
+    <a class="shot" href="VAGRANT_STARS/" aria-label="Play VAGRANT STARS"><img src="assets/vagrant-stars.jpg" alt="A small fighter banks through an asteroid field under a white sun, lasers streaking toward a raider." width="1920" height="1080"></a>
+    <div class="about">
+      <p class="genre">3D space trading and combat</p>
+      <h2>VAGRANT STARS</h2>
+      <p>One ship, six suns and nobody to answer to. Haul cargo between thirteen ports, hunt raiders for the Wardens or run contraband past them, ride the slingways, jump the fold gates, and trade your way from a two-gun Sparrow up to the fastest interceptor in the Tessel Reach.</p>
+      <ul>
+        <li>Cursor-led 3D flight with cruise drive, afterburner and drift</li>
+        <li>Six hulls, ten guns, missiles, shields and a living economy</li>
+        <li>Six factions that remember what you did</li>
+        <li>Contract boards and a five-part storyline</li>
+      </ul>
+      <p class="play"><a class="button" href="VAGRANT_STARS/">Play VAGRANT STARS</a> <span>Mouse and keyboard · WebGL</span></p>
+    </div>
+  </article>
+</main>
+<footer>
+  <p>Built with the <a href="https://github.com/QSOLKCB/VANILLAJS">VANILLAJS</a> engine. Source and licence: <a href="https://github.com/QSOLKCB/OFFLINE-GAMES">QSOLKCB/OFFLINE-GAMES</a> (Apache-2.0).</p>
+  <p id="offline-state" hidden></p>
+</footer>
+<script>
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  navigator.serviceWorker.register('sw.js').then(() => navigator.serviceWorker.ready).then(() => {
+    var note = document.getElementById('offline-state'); note.textContent = 'Saved for offline play on this device.'; note.hidden = false;
+  }).catch(function () {});
+}
+</script>
+</body>
+</html>

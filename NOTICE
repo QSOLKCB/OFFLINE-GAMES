@@ -1,0 +1,11 @@
+OFFLINE GAMES — a QSOL–IMC project
+Copyright 2026 QSOL–IMC / Trent Slade and contributors.
+Licensed under the Apache License, Version 2.0. See LICENSE.
+
+The games, their settings, rules, text, procedural geometry and synthesized
+audio are original work for this repository. No commercial game's code, names,
+data, artwork, music or other assets are included.
+
+VAGRANT STARS vendors unmodified modules of QSOLKCB/VANILLAJS (Apache-2.0)
+under VAGRANT_STARS/vendor/vanillajs with that project's LICENSE, NOTICE and a
+pinned provenance record. See VAGRANT_STARS/NOTICE.md for details.
