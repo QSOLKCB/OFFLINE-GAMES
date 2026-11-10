@@ -1,0 +1,44 @@
+{
+  "repository": "https://github.com/QSOLKCB/VANILLAJS",
+  "commit": "6b07c63aca143a34f0d3cf29bb2a7c8bc03e0e5e",
+  "retrieved": "2026-11-10",
+  "modules": [
+    "math",
+    "collision",
+    "flight",
+    "time",
+    "input",
+    "projectiles",
+    "render-webgl",
+    "lead-solver",
+    "interactions",
+    "audio2d"
+  ],
+  "localChanges": [],
+  "usedBy": {
+    "math": "vectors, quaternions, camera matrices, seeded randomness",
+    "collision": "AABB sweeps behind flight and projectiles",
+    "flight": "every ship's assisted 6DOF flight",
+    "time": "fixed 60 Hz simulation clock",
+    "input": "action state and keyboard lifecycle",
+    "projectiles": "all gunfire, against moving ship boxes",
+    "render-webgl": "the WebGL renderer",
+    "lead-solver": "NPC gunnery, the HUD lead marker and gunnery assist",
+    "interactions": "dock / jump / slingway permission rules",
+    "audio2d": "all baked sound effects"
+  },
+  "sha256": {
+    "LICENSE": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+    "NOTICE": "f2614639df44fb65f6b2c3f9ce4f3f1bcfd1ab703e78ef6304e83d77c8e68c44",
+    "modules/math/index.js": "4f4ebf0786b97342c11004b8830a535890b16693458a0436edb1fc581a411da7",
+    "modules/collision/index.js": "99c0f4bc106d4162fc5bea057a7108d7cf52526279b2a8ad4e4f27c1f0e6f5c1",
+    "modules/flight/index.js": "da9d416b5148a61bdad9ec46e499a62428eb96a091be4ff40248f3bb3cb9dcc6",
+    "modules/time/index.js": "de94c0bc04e6a269504c5742455ce114f824c2c0d9d59a2fd94555df5d9bb4a2",
+    "modules/input/index.js": "e157c0eaee89ea240fa0abe43ca24d02620c917f3188f75dcc4d765392eca025",
+    "modules/projectiles/index.js": "9d1c045345593b9babebeb89999d99205a148361166c744d9f17c46ef2f0a0c1",
+    "modules/render-webgl/index.js": "af088cc5c4456ee07908d1561327c37c11d5c168b7d1b2c366149883f070e87c",
+    "modules/lead-solver/index.js": "e0ed0b67ebbf972f4e1bcf900f24cf56048252bc853073ed0f89cc7328bb06c1",
+    "modules/interactions/index.js": "ac7e3fa91c6b89c7a34da84b869c02d12bbdd62805cd9dd252abfbf5274ed13b",
+    "modules/audio2d/index.js": "07e19391b84034acba56ef840a4d622b70e815f5376de123b6a07a9ccebf3098"
+  }
+}

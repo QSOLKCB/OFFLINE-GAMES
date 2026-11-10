@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VAGRANT STARS — open-space trading and combat</title>
+<meta name="description" content="Fly, trade and fight across six star systems. An original 3D space game on pure web standards, built with the VANILLAJS engine.">
+<meta name="theme-color" content="#050a12">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="view" aria-label="Space view"></canvas>
+<canvas id="hud" tabindex="0" aria-label="Flight display. Mouse steers, keyboard flies."></canvas>
+<div id="flash" aria-hidden="true"></div>
+
+<section id="menu" class="overlay">
+  <div class="menu-card">
+    <p class="kicker">QSOL-IMC · OFFLINE GAMES</p>
+    <h1>VAGRANT <span>STARS</span></h1>
+    <p class="tagline">One ship. Six suns. Whatever you can carry, and whoever you can outfly.</p>
+    <div class="menu-buttons">
+      <button id="btn-continue" class="primary" hidden>Continue</button>
+      <button id="btn-new" class="primary">New captain</button>
+      <button id="btn-help">How to fly</button>
+    </div>
+    <p class="small" id="menu-note">Mouse and keyboard. Runs offline once loaded. Progress is saved in this browser.</p>
+    <p class="small"><a href="../">◂ All offline games</a></p>
+  </div>
+</section>
+
+<section id="help" class="overlay" hidden>
+  <div class="panel">
+    <h2>How to fly</h2>
+    <div class="keys">
+      <div><h3>Flight</h3><ul>
+        <li><kbd>Mouse</kbd> steer — the ship turns toward the cursor</li>
+        <li><kbd>W</kbd> <kbd>S</kbd> or wheel — throttle up / down</li>
+        <li><kbd>A</kbd> <kbd>D</kbd> strafe · <kbd>X</kbd> brake</li>
+        <li><kbd>Shift</kbd> afterburner (hold)</li>
+        <li><kbd>C</kbd> cruise drive — fast travel, no guns</li>
+        <li><kbd>Z</kbd> cut engines and drift</li>
+        <li><kbd>Space</kbd> free the cursor · arrows also steer</li>
+      </ul></div>
+      <div><h3>Combat</h3><ul>
+        <li><kbd>Left mouse</kbd> fire guns at the cursor</li>
+        <li><kbd>Right mouse</kbd> or <kbd>Q</kbd> launch missile</li>
+        <li><kbd>R</kbd> nearest hostile · <kbd>T</kbd> next ship</li>
+        <li><kbd>Y</kbd> target what the cursor is on</li>
+        <li><kbd>H</kbd> hull patch · <kbd>J</kbd> shield cell</li>
+        <li><kbd>B</kbd> tractor in floating cargo</li>
+        <li>Aim at the red lead marker to hit a moving ship</li>
+      </ul></div>
+      <div><h3>Travel</h3><ul>
+        <li><kbd>N</kbd> next place · <kbd>M</kbd> navigation map</li>
+        <li><kbd>F</kbd> dock / jump / ride — flies you there first</li>
+        <li><kbd>G</kbd> autopilot to target</li>
+        <li>Slingway rings fling you across a system</li>
+        <li>Fold gates jump between systems</li>
+        <li><kbd>Esc</kbd> or <kbd>P</kbd> pause</li>
+      </ul></div>
+    </div>
+    <button class="primary" data-close>Back</button>
+  </div>
+</section>
+
+<section id="pause" class="overlay" hidden>
+  <div class="panel narrow">
+    <h2>Paused</h2>
+    <label>Effects volume <input id="vol-sfx" type="range" min="0" max="1" step="0.05"></label>
+    <label>Music volume <input id="vol-music" type="range" min="0" max="1" step="0.05"></label>
+    <div class="menu-buttons">
+      <button id="btn-resume" class="primary">Resume</button>
+      <button id="btn-pause-help">How to fly</button>
+      <button id="btn-quit">Quit to title</button>
+    </div>
+    <p class="small">Your game is saved each time you dock. Quitting in flight returns you to your last port.</p>
+  </div>
+</section>
+
+<section id="dead" class="overlay" hidden>
+  <div class="panel narrow">
+    <h2>Ship lost</h2>
+    <p id="dead-text">Your hull breaks up in silence.</p>
+    <div class="menu-buttons"><button id="btn-restore" class="primary">Return to last port</button><button id="btn-dead-quit">Quit to title</button></div>
+  </div>
+</section>
+
+<section id="fail" class="overlay" hidden><div class="panel narrow"><h2>Cannot start</h2><p id="fail-text"></p><p class="small"><a href="../">◂ All offline games</a></p></div></section>
+<section id="station" class="overlay station" hidden></section>
+<script type="module" src="js/app.js"></script>
+<noscript><p style="color:#fff;padding:2rem">VAGRANT STARS needs JavaScript and WebGL.</p></noscript>
+</body>
+</html>
