@@ -144,7 +144,7 @@ export class Scene {
   /** Camera-facing additive halo: dark centre, bright band, dark rim. */
   #ring(pos, radius, color, segs = 14) {
     const c = this.cam.pos, ox = pos[0] - c[0], oy = pos[1] - c[1], oz = pos[2] - c[2], stream = this.nearGlow;
-    if (!stream.room(segs * 9) || Math.hypot(ox, oy, oz) + radius > NEAR_LIMIT) return;
+    if (!stream.room(segs * 12) || Math.hypot(ox, oy, oz) + radius > NEAR_LIMIT) return;
     const R = this.right, U = this.up, out = stream.data; let n = stream.n;
     const put = (a, k, lit) => {
       const x = Math.cos(a) * radius * k, y = Math.sin(a) * radius * k;
@@ -154,7 +154,7 @@ export class Scene {
     for (let i = 0; i < segs; i++) {
       const a = i / segs * Math.PI * 2, b = (i + 1) / segs * Math.PI * 2;
       put(a, 0.45, false); put(a, 0.86, true); put(b, 0.86, true); put(a, 0.45, false); put(b, 0.86, true); put(b, 0.45, false);
-      put(a, 0.86, true); put(a, 1, false); put(b, 1, false);
+      put(a, 0.86, true); put(a, 1, false); put(b, 1, false); put(a, 0.86, true); put(b, 1, false); put(b, 0.86, true);
     }
     stream.n = n;
   }

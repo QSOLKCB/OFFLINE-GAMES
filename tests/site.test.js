@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {existsSync, readFileSync, rmSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import {join} from 'node:path';
-import {root, siteFiles, precacheList, swFilesLine} from '../scripts/site.mjs';
+import {root, GAMES, siteFiles, precacheList, swFilesLine} from '../scripts/site.mjs';
 
 const read = file => readFileSync(join(root, file), 'utf8');
 
@@ -14,7 +14,7 @@ test('the service worker precaches exactly the published site', async () => {
   assert.ok(sw.includes("const VERSION = 'dev';"), 'the version marker the build stamps is present');
   execFileSync(process.execPath, ['--check', join(root, 'sw.js')]); // a worker that fails to parse silently disables offline play
   for (const entry of list) assert.ok(existsSync(join(root, entry.endsWith('/') ? entry + 'index.html' : entry)), entry);
-  assert.ok(list.includes('./VAGRANT_STARS/js/app.js') && list.includes('./VAGRANT_STARS/vendor/vanillajs/modules/flight/index.js'));
+  for (const game of Object.keys(GAMES)) assert.ok(list.includes(`./${game}/`) && list.includes(`./${game}/js/app.js`) && list.includes(`./${game}/vendor/vanillajs/modules/flight/index.js`), game);
 });
 
 test('published pages only reference files that are published', async () => {
@@ -27,9 +27,21 @@ test('published pages only reference files that are published', async () => {
       assert.ok(files.has(path), `${page} -> ${ref}`);
     }
   };
-  check('index.html', '.'); check('VAGRANT_STARS/index.html', 'VAGRANT_STARS');
+  check('index.html', '.');
+  for (const game of Object.keys(GAMES)) check(`${game}/index.html`, game);
   const manifest = JSON.parse(read('manifest.webmanifest'));
   assert.equal(manifest.start_url, './'); for (const icon of manifest.icons) assert.ok(files.has(icon.src));
+});
+
+test('the landing page links to every game, and every game links back', () => {
+  const home = read('index.html');
+  assert.ok(Object.keys(GAMES).length >= 2);
+  for (const game of Object.keys(GAMES)) {
+    assert.ok(home.includes(`<a class="button" href="${game}/">`), `the landing page has a Play link for ${game}`);
+    const page = read(`${game}/index.html`);
+    assert.match(page, /<a href="\.\.\/">[^<]*All offline games<\/a>/, `${game} links back to the collection`);
+    assert.ok(page.includes('<script type="module" src="js/app.js">') && page.includes('href="../manifest.webmanifest"'));
+  }
 });
 
 test('every module import resolves to a published file', async () => {

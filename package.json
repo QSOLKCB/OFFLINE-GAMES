@@ -1,13 +1,13 @@
 {
   "name": "offline-games",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "A collection of offline browser games built on pure web standards.",
   "license": "Apache-2.0",
   "scripts": {
     "start": "node scripts/serve.mjs",
-    "test": "node --test VAGRANT_STARS/tests/*.test.js tests/*.test.js",
-    "test:browser": "node VAGRANT_STARS/tests/browser-smoke.mjs"
+    "test": "node --test VAGRANT_STARS/tests/*.test.js IRONWAKE/tests/*.test.js tests/*.test.js",
+    "test:browser": "node VAGRANT_STARS/tests/browser-smoke.mjs && node IRONWAKE/tests/browser-smoke.mjs"
   }
 }
