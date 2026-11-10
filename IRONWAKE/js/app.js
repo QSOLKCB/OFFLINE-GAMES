@@ -7,12 +7,14 @@ import {Scene} from './render.js';
 import {drawHud, drawMap, mapPick} from './hud.js';
 import {StationUI} from './ui.js';
 import {GameAudio} from './audio.js';
+import {pickEnemy} from './selection.js';
 import {World, headingOf} from './sim/world.js';
 import {newPlayer, sanitizeSave} from './sim/player.js';
 import {STATIONS} from './sim/data.js';
 
 const SAVE_KEY = 'ironwake.save.v1', SETTINGS_KEY = 'ironwake.settings.v1', STEP = 1 / 60;
 const $ = id => document.getElementById(id);
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const view = $('view'), hud = $('hud'), flash = $('flash'), ctx = hud.getContext('2d');
 const overlays = {menu: $('menu'), help: $('help'), pause: $('pause'), dead: $('dead'), station: $('station'), fail: $('fail')};
 const store = {
@@ -36,7 +38,7 @@ const bindings = {KeyW: 'up', KeyS: 'down', KeyA: 'port', KeyD: 'starboard', Shi
   ArrowLeft: 'lookLeft', ArrowRight: 'lookRight', ArrowUp: 'lookUp', ArrowDown: 'lookDown'};
 const actions = new Actions(), clock = new FixedClock({step: STEP, maxSteps: 6});
 let mode = 'menu', world = null, player = null, backdrop = null, last = null, helpFrom = 'menu';
-let castOff = 0, cursor = null, pendingTorpedo = false, deflectHeld = false, triggerHeld = false, shake = 0, lastAlert = 0, tipAt = 0, tipIndex = 0, banner = null;
+let castOff = 0, cursor = null, pendingTorpedo = false, triggerHeld = false, shake = 0, lastAlert = 0, tipAt = 0, tipIndex = 0, banner = null;
 const view3 = {rel: 0, pitch: 0.42, zoom: 1}; // camera yaw relative to the bow, look-down angle, distance factor
 const sailing = () => mode === 'flight';
 const keyboard = attachKeyboard(window, actions, {bindings, enabled: () => mode === 'flight' || mode === 'map'});
@@ -44,17 +46,17 @@ const keyboard = attachKeyboard(window, actions, {bindings, enabled: () => mode 
 const look = attachMouseLook(hud, {enabled: sailing, onUnlock: () => { if (mode === 'flight') setMode('paused'); }});
 const cam = {pos: [0, 0, 0], q: [0, 0, 0, 1]}, poses = new Map(), messages = [];
 const TIPS = ['Move the mouse to look around. W and S set the throttle; A and D work the rudder.', 'Look to port or starboard, hold the left button (or Space) to steady the guns, and release to fire.',
-  'Hold the right button (or E) to raise the deflector when a salvo comes in. It must recharge after.', 'Press N to plot a course to a port and J to warp there. F docks when you are close and slow.',
+  'Hold E to raise the deflector when a salvo comes in. It must recharge after.', 'Press N to plot a course to a port and J to warp there. F docks when you are close and slow.',
   'Small rocks crack under a broadside. Ore and cargo drift into your hold on their own.'];
 
 function setMode(next) {
   mode = next;
   for (const [name, node] of Object.entries(overlays)) node.hidden = !((name === 'menu' && next === 'menu') || (name === 'help' && next === 'help') || (name === 'pause' && next === 'paused')
     || (name === 'dead' && next === 'dead') || (name === 'station' && next === 'docked'));
-  clock.setPaused(next !== 'flight'); keyboard.clear(); pendingTorpedo = false; deflectHeld = false; triggerHeld = false; last = null;
+  clock.setPaused(next !== 'flight'); keyboard.clear(); pendingTorpedo = false; triggerHeld = false; last = null;
   if (next !== 'flight') look.release();
   hud.style.visibility = next === 'flight' || next === 'map' ? 'visible' : 'hidden';
-  hud.style.cursor = next === 'map' ? 'default' : 'none';
+  hud.style.cursor = next === 'map' ? 'default' : 'crosshair';
   if (next === 'flight' || next === 'map') hud.focus({preventScroll: true}); else if (document.activeElement === hud) hud.blur();
 }
 function say(text, tone = 'info', from = null) { messages.push({text, tone, from, ttl: 7}); while (messages.length > 7) messages.shift(); }
@@ -134,7 +136,7 @@ function edges() {
 const viewYaw = () => headingOf(world.playerShip) + view3.rel;
 function command() {
   const yaw = viewYaw();
-  return {rudder: actions.axis('starboard', 'port'), throttle: actions.axis('down', 'up'), boost: !!actions.value('boost'), deflect: deflectHeld || !!actions.value('deflect'),
+  return {rudder: actions.axis('starboard', 'port'), throttle: actions.axis('down', 'up'), boost: !!actions.value('boost'), deflect: !!actions.value('deflect'),
     hold: triggerHeld || !!actions.value('fire'), aim: [-Math.sin(yaw), -Math.cos(yaw)], torpedo: false};
 }
 hud.addEventListener('pointermove', e => { cursor = {x: e.clientX, y: e.clientY}; });
@@ -142,9 +144,16 @@ hud.addEventListener('pointerdown', e => {
   audio.unlock(); cursor = {x: e.clientX, y: e.clientY};
   if (mode === 'map') { const port = mapPick(hud.clientWidth, hud.clientHeight, world, e.clientX, e.clientY); if (port) { world.selectDest(port.id); audio.play('click', {gain: 0.5}); } }
 });
-// The right button raises the deflector whether or not the pointer is captured.
-document.addEventListener('mousedown', e => { if (e.button === 2 && mode === 'flight') { deflectHeld = true; e.preventDefault(); } });
-document.addEventListener('mouseup', e => { if (e.button === 2) deflectHeld = false; });
+// Under pointer lock the crosshair selects; otherwise use the actual cursor.
+document.addEventListener('mousedown', e => {
+  if (e.button !== 2 || mode !== 'flight' || world.over || e.target !== hud) return;
+  e.preventDefault();
+  const rect = hud.getBoundingClientRect();
+  const x = look.locked ? rect.width / 2 : e.clientX - rect.left;
+  const y = look.locked ? rect.height / 2 : e.clientY - rect.top;
+  const ship = pickEnemy(world, scene, poses, x, y, rect.width, rect.height);
+  if (ship) { world.target = ship.id; audio.play('click', {gain: 0.45}); }
+});
 document.addEventListener('contextmenu', e => { if (mode === 'flight' || mode === 'map') e.preventDefault(); });
 document.addEventListener('wheel', e => { if (mode === 'flight') view3.zoom = clamp(view3.zoom + Math.sign(e.deltaY) * 0.12, 0.6, 2.4); }, {passive: true});
 window.addEventListener('blur', () => { if (mode === 'flight' || mode === 'map') setMode('paused'); });
@@ -192,7 +201,13 @@ function frame(now) {
   requestAnimationFrame(frame);
   const seconds = last === null ? 0 : Math.min(0.25, (now - last) / 1000);
   last = now;
-  if (mode === 'docked') { audio.update(false); return; }
+  if (mode === 'docked') {
+    const port = world.sector.byId.get(world.docked);
+    updatePoses(world, 1, world.time);
+    orbit(port.pos, 2.3 + (reducedMotion ? 0 : now / 1000 * 0.012), 0.22, port.radius * 3.8);
+    scene.draw(world, cam, poses, 0, reducedMotion ? 0 : seconds);
+    audio.update(false, 0, 0, world); return;
+  }
   if (!world) { // title backdrop: Anchorage Prime and whoever is sailing past
     backdrop ??= new World(newPlayer(11));
     backdrop.step(Math.min(seconds, 0.05), {}); backdrop.events.length = 0;
@@ -233,11 +248,11 @@ function frame(now) {
   const ui = {cursor, messages, poses, camYaw: viewYaw(), hint: banner?.text ?? (look.locked || mode !== 'flight' || world.time - castOff > 14 ? null : 'Click the view to capture the mouse — or drag to look; arrow keys also work')};
   if (mode === 'map') drawMap(ctx, hud.clientWidth, hud.clientHeight, world, ui); else drawHud(ctx, hud.clientWidth, hud.clientHeight, world, scene, ui);
   const power = me.warp.state === 'on' ? 3 : me.boosting ? 1.8 : me.throttle;
-  audio.update(mode === 'flight', power, world.contacts().some(c => c.attitude === 'hostile' && c.dist < 3000) ? 1 : 0);
+  audio.update(mode === 'flight', power, world.contacts().some(c => c.attitude === 'hostile' && c.dist < 3000) ? 1 : 0, world);
 }
 
 refreshMenu(); setMode('menu');
 requestAnimationFrame(frame);
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('../sw.js').catch(() => {});
 // Read-only handle for automated smoke tests and the curious.
-globalThis.__ironwake = {get world() { return world; }, get player() { return player; }, get mode() { return mode; }, scene, view: view3};
+globalThis.__ironwake = {get world() { return world; }, get player() { return player; }, get mode() { return mode; }, scene, audio, view: view3};

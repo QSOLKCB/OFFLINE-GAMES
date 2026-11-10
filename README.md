@@ -16,6 +16,14 @@ connection.
 Both are built on the [VANILLAJS](https://github.com/QSOLKCB/VANILLAJS) engine. Each game is a
 self-contained folder with its own tests and its own pinned copy of the engine modules it uses.
 
+## Presentation and controls
+
+Both games now have procedural nebula skies, textured planets and atmospheres,
+animated port approaches, live dockside views and a fuller stereo soundscape.
+Right-click selects an enemy; Q fires missiles/torpedoes and IRONWAKE uses E for
+its deflector. See [the presentation notes](docs/PRESENTATION.md) for the changes,
+VANILLAJS/OPT provenance, resource bounds and validation commands.
+
 ## Run locally
 
 ```bash

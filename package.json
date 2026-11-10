@@ -8,6 +8,6 @@
   "scripts": {
     "start": "node scripts/serve.mjs",
     "test": "node --test VAGRANT_STARS/tests/*.test.js IRONWAKE/tests/*.test.js tests/*.test.js",
-    "test:browser": "node VAGRANT_STARS/tests/browser-smoke.mjs && node IRONWAKE/tests/browser-smoke.mjs"
+    "test:browser": "node VAGRANT_STARS/tests/browser-smoke.mjs && node IRONWAKE/tests/browser-smoke.mjs && node tests/presentation-browser.mjs"
   }
 }

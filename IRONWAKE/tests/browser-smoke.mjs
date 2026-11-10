@@ -29,7 +29,7 @@ try {
       cargo: g.player?.cargo, credits: g.player?.credits, drawn: g.scene.far.n + g.scene.near.n, rel: g.view.rel};
   });
   const until = async (label, check, seconds = 40) => {
-    for (let i = 0; i < seconds * 5; i++) { const state = await game(); if (check(state)) return state; await page.waitForTimeout(200); }
+    for (let i = 0; i < seconds * 5; i++) { const state = await game(); if (await check(state)) return state; await page.waitForTimeout(200); }
     assert.fail(`timed out waiting for: ${label} (${JSON.stringify(await game())})`);
   };
 

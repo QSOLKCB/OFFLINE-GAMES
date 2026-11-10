@@ -35,6 +35,22 @@ jobs:
         run: |
           node --version
           node --test VAGRANT_STARS/tests/*.test.js IRONWAKE/tests/*.test.js tests/*.test.js
+      - name: Install pinned browser test tooling
+        run: |
+          npm install --no-save --package-lock=false playwright@1.62.1
+          npx playwright install --with-deps chromium
+      - name: Play both games and verify presentation
+        run: |
+          node VAGRANT_STARS/tests/browser-smoke.mjs
+          node IRONWAKE/tests/browser-smoke.mjs
+          node tests/presentation-browser.mjs
+      - name: Preserve browser evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: presentation-${{ github.sha }}
+          path: evidence/browser/
+          if-no-files-found: ignore
       - name: Stage the site and check each game is in it
         run: |
           node scripts/site.mjs build _site "${GITHUB_SHA::12}"

@@ -2,6 +2,7 @@
 // Sound for VAGRANT STARS. Effects are scored as VANILLAJS audio2d events (integer-sample,
 // four lanes, 48 kHz) and baked once into AudioBuffers; the engine hum and the ambient score
 // are live Web Audio voices. Each star system has its own root note, so every sky has a key.
+import {Soundstage, masterPCM, MAX_EFFECT_VOICES} from './soundscape.js';
 import {createSound2D, AUDIO2D_RATE} from '../vendor/vanillajs/modules/audio2d/index.js';
 
 const ms = t => Math.max(1, Math.round(t * AUDIO2D_RATE / 1000));
@@ -49,63 +50,70 @@ const CHORDS = [[0, 2, 4], [5, 0, 2], [3, 5, 0], [4, 6, 1]];
 const note = (root, degree, octave = 0) => root * 2 ** (octave + (SCALE[((degree % 7) + 7) % 7] + 12 * Math.floor(degree / 7)) / 12);
 
 export class GameAudio {
-  constructor() { this.ctx = null; this.buffers = new Map(); this.sfxVolume = 0.7; this.musicVolume = 0.5; this.root = 110; this.bar = 0; this.nextBar = 0; this.tension = 0; }
+  constructor() { this.ctx = null; this.voices = new Set(); this.buffers = new Map(); this.sfxVolume = 0.7; this.musicVolume = 0.5; this.root = 110; this.bar = 0; this.nextBar = 0; this.tension = 0; }
   /** Call from a user gesture. */
   unlock() {
     if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
     const Ctx = globalThis.AudioContext ?? globalThis.webkitAudioContext;
     if (!Ctx) return;
     const ctx = this.ctx = new Ctx();
-    this.sfx = ctx.createGain(); this.music = ctx.createGain(); this.sfx.connect(ctx.destination);
-    const delay = ctx.createDelay(1.5), feedback = ctx.createGain(), wet = ctx.createGain();
-    delay.delayTime.value = 0.62; feedback.gain.value = 0.42; wet.gain.value = 0.5;
-    this.music.connect(ctx.destination); this.music.connect(delay); delay.connect(feedback); feedback.connect(delay); delay.connect(wet); wet.connect(ctx.destination);
+    this.sfx = ctx.createGain(); this.music = ctx.createGain();
+    this.stage = new Soundstage(ctx, this.sfx, this.music);
     this.engineOsc = ctx.createOscillator(); this.engineOsc.type = 'sawtooth'; this.engineFilter = ctx.createBiquadFilter(); this.engineFilter.type = 'lowpass';
     this.engineGain = ctx.createGain(); this.engineGain.gain.value = 0;
     this.engineOsc.connect(this.engineFilter); this.engineFilter.connect(this.engineGain); this.engineGain.connect(this.sfx); this.engineOsc.start();
     this.setVolumes(this.sfxVolume, this.musicVolume);
     for (const name of Object.keys(SOUNDS)) {
       const pcm = renderSound(name), buffer = ctx.createBuffer(1, pcm.length, AUDIO2D_RATE), out = buffer.getChannelData(0);
-      for (let i = 0; i < pcm.length; i++) out[i] = pcm[i] / 32768;
+      out.set(masterPCM(pcm, AUDIO2D_RATE));
       this.buffers.set(name, buffer);
     }
   }
   setVolumes(sfx, music) {
     this.sfxVolume = sfx; this.musicVolume = music;
-    if (this.ctx) { this.sfx.gain.value = sfx; this.music.gain.value = music * 0.5; }
+    if (this.ctx) { this.sfx.gain.value = sfx; this.music.gain.value = music * 0.5; this.stage.wet.gain.value = music * 0.4; }
   }
   play(name, {gain = 1, pan = 0, rate = 1} = {}) {
     const ctx = this.ctx, buffer = this.buffers.get(name);
-    if (!ctx || !buffer || ctx.state !== 'running' || gain <= 0.01) return;
+    if (!ctx || !buffer || ctx.state !== 'running' || gain <= 0.01 || this.voices.size >= MAX_EFFECT_VOICES) return;
     const source = ctx.createBufferSource(), g = ctx.createGain();
     source.buffer = buffer; source.playbackRate.value = rate; g.gain.value = Math.min(1, gain);
-    if (ctx.createStereoPanner) { const p = ctx.createStereoPanner(); p.pan.value = Math.max(-1, Math.min(1, pan)); source.connect(g); g.connect(p); p.connect(this.sfx); }
-    else { source.connect(g); g.connect(this.sfx); }
+    const p = ctx.createStereoPanner?.();
+    source.connect(g);
+    if (p) { p.pan.value = Math.max(-1, Math.min(1, pan)); g.connect(p); p.connect(this.sfx); } else g.connect(this.sfx);
+    this.voices.add(source);
+    source.onended = () => { source.disconnect(); g.disconnect(); p?.disconnect(); this.voices.delete(source); };
     source.start();
   }
   setSystem(root) { this.root = root; this.bar = 0; }
   /** power 0..3 drives the engine hum; tension 0..1 thickens the score. Pass active=false to idle. */
-  update(active, power = 0, tension = 0) {
+  update(active, power = 0, tension = 0, world = null) {
     const ctx = this.ctx;
     if (!ctx || ctx.state !== 'running') return;
     const t = ctx.currentTime;
+    this.stage.update(active, power, world);
     this.engineGain.gain.setTargetAtTime(active ? 0.035 + power * 0.04 : 0, t, 0.15);
     this.engineOsc.frequency.setTargetAtTime(46 + power * 44, t, 0.2); this.engineFilter.frequency.setTargetAtTime(160 + power * 420, t, 0.2);
     this.tension += (tension - this.tension) * 0.05;
-    if (t < this.nextBar) return;
+    if (t < this.nextBar || this.musicVolume === 0) return;
     this.nextBar = Math.max(t, this.nextBar) + 4.2;
     const chord = CHORDS[this.bar % CHORDS.length], start = this.nextBar - 4.1;
     chord.forEach((degree, i) => this.#pad(note(this.root, degree, i === 0 ? 0 : 1), start + i * 0.12, 5.4, 0.05));
     this.#pad(note(this.root, chord[0], -1), start, 5.4, 0.07, 'triangle');
     if (this.bar % 2 === 0) this.#pad(note(this.root, chord[(this.bar >> 1) % 3] + 7, 2), start + 2.1, 2.4, 0.022, 'sine', 0.05);
     if (this.tension > 0.3) for (let i = 0; i < 8; i++) this.#pad(note(this.root, chord[0], -1) * (i % 4 === 3 ? 1.5 : 1), start + i * 0.525, 0.3, 0.06 * this.tension, 'square', 0.01, 420);
+    if (this.tension < 0.3 && this.bar % 2 === 1) for (let i = 0; i < 3; i++)
+      this.#pad(note(this.root, chord[i] + 7, 1), start + 1.1 + i * 0.7, 1.5, 0.018, 'sine', 0.015);
     this.bar++;
   }
   #pad(frequency, start, length, gain, type = 'sine', attack = 1.4, cutoff = 0) {
     const ctx = this.ctx, osc = ctx.createOscillator(), g = ctx.createGain();
     osc.type = type; osc.frequency.value = frequency; osc.detune.value = (frequency % 7) - 3;
     g.gain.setValueAtTime(0, start); g.gain.linearRampToValueAtTime(gain, start + attack); g.gain.linearRampToValueAtTime(0, start + length);
-    if (cutoff) { const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = cutoff; osc.connect(f); f.connect(g); } else osc.connect(g);
-    g.connect(this.music); osc.start(start); osc.stop(start + length + 0.05);
+    const f = cutoff ? ctx.createBiquadFilter() : null, p = ctx.createStereoPanner?.();
+    if (f) { f.type = 'lowpass'; f.frequency.value = cutoff; osc.connect(f); f.connect(g); } else osc.connect(g);
+    if (p) { p.pan.value = Math.sin(frequency * 0.037) * 0.65; g.connect(p); p.connect(this.music); } else g.connect(this.music);
+    osc.onended = () => { osc.disconnect(); g.disconnect(); f?.disconnect(); p?.disconnect(); };
+    osc.start(start); osc.stop(start + length + 0.05);
   }
 }

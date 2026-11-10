@@ -45,8 +45,9 @@ The game saves in this browser each time you dock.
 | A / D | Rudder to port / starboard |
 | Shift (hold) | Boost |
 | Left mouse or Space (hold, then release) | Steady and fire the broadside you are looking along |
-| Right mouse or E (hold) | Deflector |
+| E (hold) | Deflector |
 | Q | Torpedo at the selected ship |
+| Right mouse | Select the enemy under the cursor (centre crosshair while captured) |
 | R / T | Nearest hostile / next ship |
 | N | Plot a course to the next port or contract marker |
 | J | Warp drive toward the plotted course |

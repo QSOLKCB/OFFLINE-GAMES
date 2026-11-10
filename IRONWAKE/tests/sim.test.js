@@ -307,3 +307,18 @@ test('vendored VANILLAJS modules match their recorded provenance', () => {
   assert.match(record.commit, /^[0-9a-f]{40}$/); assert.deepEqual(record.localChanges, []); assert.equal(Object.keys(record.sha256).length, record.modules.length + 2);
   for (const [file, hash] of Object.entries(record.sha256)) assert.equal(createHash('sha256').update(readFileSync(new URL(file, dir))).digest('hex'), hash, file);
 });
+
+test('homing uses the full signed angle for astern, obtuse and overshot targets', () => {
+  for (const offset of [[0, 600], [50, 600], [-50, 600], [500, -500]]) {
+    const {w} = quiet(), me = w.playerShip;
+    const [boat] = w.spawnSquadron({faction: 'pennant', threat: 2, pos: [8000, 0, 8000]});
+    boat.body.position = [8000 + offset[0], 0, 8000 + offset[1]]; boat.body.velocity = [0,0,0];
+    const t = {x: 8000, z: 8000, dir: [0,-1], target: boat.id, owner: me.id, life: 10};
+    w.torpedoes.push(t); w.step(DT, {});
+    const angle = Math.atan2(t.dir[0], -t.dir[1]);
+    assert.ok(Math.abs(angle) > 0.001, 'even a directly astern target requires a turn');
+    assert.ok(Math.abs(angle) <= TORPEDO.turn * DT + 1e-12, 'turn rate remains bounded');
+    if (offset[0]) assert.equal(Math.sign(angle), Math.sign(offset[0]), 'shortest signed turn');
+    assert.ok(Math.abs(Math.hypot(...t.dir) - 1) < 1e-12);
+  }
+});

@@ -1,0 +1,50 @@
+{
+  "node": "v24.22.1",
+  "cpu": "INTEL(R) XEON(R) PLATINUM 8573C",
+  "platform": "linux",
+  "arch": "x64",
+  "frames_per_trial": 60,
+  "discs_per_frame": 2000,
+  "exact_float64_parity": true,
+  "cache_bytes": 2544,
+  "sky_bake_ms": 540.3118120000001,
+  "samples": [
+    {
+      "reference_ms": 139.793929,
+      "cached_ms": 18.079478999999992
+    },
+    {
+      "cached_ms": 26.536393000000032,
+      "reference_ms": 118.13672499999996
+    },
+    {
+      "reference_ms": 117.72046999999998,
+      "cached_ms": 18.138329
+    },
+    {
+      "cached_ms": 25.574929999999995,
+      "reference_ms": 115.64807400000007
+    },
+    {
+      "reference_ms": 104.06463599999995,
+      "cached_ms": 25.80332199999998
+    },
+    {
+      "cached_ms": 18.660974999999894,
+      "reference_ms": 103.70028900000011
+    },
+    {
+      "reference_ms": 111.17722800000001,
+      "cached_ms": 20.471664999999803
+    },
+    {
+      "cached_ms": 19.106711000000132,
+      "reference_ms": 131.98279100000013
+    },
+    {
+      "reference_ms": 109.27506900000003,
+      "cached_ms": 19.307416000000103
+    }
+  ],
+  "scope": "Glow-disc trigonometry kernel only. Texture generation is a new presentation cost, paid per system change. No GPU/FPS claim."
+}

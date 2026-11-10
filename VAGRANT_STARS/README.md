@@ -46,7 +46,8 @@ game saves in this browser each time you dock.
 | Z | Cut engines and drift |
 | Space | Free the cursor (arrow keys also steer) |
 | Left mouse | Fire guns at the cursor |
-| Right mouse, Q | Launch missile at the selected ship |
+| Q | Launch missile at the selected ship |
+| Right mouse | Select the enemy under the cursor |
 | R / T | Nearest hostile / next ship |
 | Y | Select what the cursor is on |
 | N | Next place |

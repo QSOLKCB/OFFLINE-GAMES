@@ -511,7 +511,9 @@ export class World {
       if (target?.alive) {
         const lead = Math.min(2, Math.hypot(target.body.position[0] - t.x, target.body.position[2] - t.z) / TORPEDO.speed);
         const wx = target.body.position[0] + target.body.velocity[0] * lead - t.x, wz = target.body.position[2] + target.body.velocity[2] * lead - t.z, wl = Math.hypot(wx, wz) || 1;
-        const cross = t.dir[0] * wz / wl - t.dir[1] * wx / wl, turn = clamp(Math.asin(clamp(cross, -1, 1)), -TORPEDO.turn * dt, TORPEDO.turn * dt), c = Math.cos(turn), s = Math.sin(turn);
+        const cross = t.dir[0] * wz / wl - t.dir[1] * wx / wl;
+        const dot = t.dir[0] * wx / wl + t.dir[1] * wz / wl;
+        const turn = clamp(Math.atan2(cross, dot), -TORPEDO.turn * dt, TORPEDO.turn * dt), c = Math.cos(turn), s = Math.sin(turn);
         t.dir = [t.dir[0] * c - t.dir[1] * s, t.dir[0] * s + t.dir[1] * c];
       }
       t.x += t.dir[0] * TORPEDO.speed * dt; t.z += t.dir[1] * TORPEDO.speed * dt;
