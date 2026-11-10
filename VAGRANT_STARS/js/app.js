@@ -126,10 +126,11 @@ function edges() {
   if (actions.consume('pause')) return mode === 'map' ? setMode('flight') : setMode('paused');
   if (actions.consume('map')) return setMode(mode === 'map' ? 'flight' : 'map');
   const w = world, inMap = mode === 'map';
+  if (w.over) { actions.edges.clear(); return; } // a destroyed ship takes no orders
   if (actions.consume('poi')) w.cyclePoi();
   if (actions.consume('use')) { w.use(); if (inMap) setMode('flight'); }
   if (actions.consume('goto')) { w.goTo(); if (inMap) setMode('flight'); }
-  if (inMap || w.over) return;
+  if (inMap) return;
   if (actions.consume('cruise')) w.toggleCruise();
   if (actions.consume('drift')) w.toggleDrift();
   if (actions.consume('hostile')) w.targetNearestHostile();
@@ -225,8 +226,10 @@ function frame(now) {
   let alpha = 1;
   if (mode === 'flight' || mode === 'map') edges();
   if (mode === 'flight') {
-    const cmd = command(); cmd.missile = pendingMissile; pendingMissile = false;
-    alpha = clock.advance(seconds, dt => { world.step(dt, cmd); cmd.missile = false; drainEvents(); }).alpha;
+    // A frame can run zero simulation ticks (displays faster than 60 Hz), so a missile request
+    // stays pending until a tick has actually consumed it.
+    const cmd = command(); cmd.missile = pendingMissile;
+    alpha = clock.advance(seconds, dt => { world.step(dt, cmd); cmd.missile = false; pendingMissile = false; drainEvents(); }).alpha;
     if (mode === 'docked') return;
   }
   const me = world.playerShip;

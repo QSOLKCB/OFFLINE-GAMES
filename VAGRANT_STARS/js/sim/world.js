@@ -275,7 +275,7 @@ export class World {
   }
   toggleCruise() {
     const s = this.playerShip;
-    if (s.lane || this.jump) return;
+    if (s.lane || this.jump || this.over) return;
     if (s.cruise.state === 'off') { s.cruise = {state: 'charging', t: 0}; s.drift = false; this.events.push({type: 'cruise', state: 'charging'}); }
     else this.#dropCruise(s);
   }
@@ -286,12 +286,13 @@ export class World {
   }
   toggleDrift() {
     const s = this.playerShip;
-    if (s.lane) return;
+    if (s.lane || this.over) return;
     s.drift = !s.drift; this.#dropCruise(s);
     this.note(s.drift ? 'Engines cut. Drifting.' : 'Engines re-lit.');
   }
   useKit() {
     const p = this.player, s = this.playerShip;
+    if (this.over) return;
     if (p.kits < 1) return this.note('No hull patches aboard.', 'warn');
     if (s.hp >= s.maxHp) return this.note('Hull is intact.');
     p.kits--; s.hp = Math.min(s.maxHp, s.hp + s.maxHp * CONSUMABLES.kit.restore);
@@ -299,6 +300,7 @@ export class World {
   }
   useCell() {
     const p = this.player, s = this.playerShip;
+    if (this.over) return;
     if (p.cells < 1) return this.note('No shield cells aboard.', 'warn');
     if (s.shield >= s.maxShield) return this.note('Shields are full.');
     p.cells--; s.shield = Math.min(s.maxShield, s.shield + s.maxShield * CONSUMABLES.cell.restore);
@@ -306,6 +308,7 @@ export class World {
   }
   tractor() { this.tractorT = 5; this.events.push({type: 'tractor'}); if (!this.loot.length) this.note('Tractor beam: nothing in range.'); }
   goTo() {
+    if (this.over) return;
     const o = this.targetObject();
     if (!o) return this.note('Select a target first (T, R, N or the map).');
     this.auto = {mode: 'goto', target: {...this.target}};
@@ -315,6 +318,7 @@ export class World {
 
   /** Dock, jump or ride: act on the targeted place, or the nearest usable one. */
   use() {
+    if (this.over || this.docked || this.jump) return;
     const ship = this.playerShip, me = ship.body.position;
     if (ship.lane) return this.#exitLane(ship, true);
     let poi = this.target?.kind === 'poi' ? this.sector.byId.get(this.target.id) : null;
@@ -347,7 +351,7 @@ export class World {
     this.syncPlayer(); p.base = poi.id; p.board++; this.docked = poi.id;
     this.events.push({type: 'dock', base: poi.id, result: missionOnDock(p, poi.id)});
   }
-  launch() { this.enterSystem(this.player.system, {base: this.player.base}); this.events.push({type: 'launch'}); }
+  launch() { if (this.over) return; this.enterSystem(this.player.system, {base: this.player.base}); this.events.push({type: 'launch'}); }
 
   #enterLane(ship, ring) {
     const lane = ring.lane, last = lane.rings.length - 1, index = lane.rings.indexOf(ring);
@@ -437,7 +441,10 @@ export class World {
     if (ship.sinceHit > 4 && ship.shield < ship.maxShield) ship.shield = Math.min(ship.maxShield, ship.shield + ship.shieldRegen * dt);
     for (const g of ship.guns) g.cd -= dt;
     if (ship.launcher) ship.launcher.cd -= dt;
-    if (ship.lane) return this.#stepLane(ship, dt);
+    if (ship.lane) {
+      if (!c.brake) return this.#stepLane(ship, dt);
+      this.#exitLane(ship, true); // braking releases the slingway, then flies on as normal
+    }
     if (ship.cruise.state === 'charging') {
       ship.cruise.t += dt;
       if (ship.cruise.t >= CRUISE_CHARGE) { ship.cruise.state = 'on'; if (ship.isPlayer) this.events.push({type: 'cruise', state: 'on'}); }

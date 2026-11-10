@@ -268,6 +268,25 @@ test('bounty contracts spawn their targets and pay when the last one dies', () =
   assert.ok(events.some(e => e.type === 'missionDone' && e.result.story));
 });
 
+test('braking releases a slingway ride', () => {
+  const {w} = quiet(), me = w.playerShip, ring = w.sector.pois.find(q => q.type === 'ring' && !q.minor && q.s === 0);
+  me.body.position = [...ring.pos]; w.targetPoi(ring.id); w.use();
+  assert.ok(me.lane, 'riding');
+  run(w, 0.5); assert.ok(me.lane && speedOf(me) > 400, 'still riding without input');
+  const events = run(w, 1, {brake: true});
+  assert.equal(me.lane, null); assert.ok(events.some(e => e.type === 'laneExit')); assert.ok(speedOf(me) < 120, `braked to ${Math.round(speedOf(me))}`);
+});
+
+test('a destroyed ship cannot dock, jump or otherwise act', () => {
+  const {p, w} = quiet();
+  p.hp = 300; w.playerShip.hp = 300; w.targetPoi('calder');
+  w.damage(w.playerShip, 1e6, 1e6, null); w.events.length = 0;
+  w.use(); w.goTo(); w.toggleCruise(); w.useKit(); w.launch();
+  assert.equal(w.docked, null); assert.equal(w.over, true); assert.equal(w.auto, null);
+  assert.equal(p.hp, 300, 'the last docking record is untouched'); assert.equal(p.board, 0); assert.equal(p.kits, 3);
+  assert.equal(w.events.some(e => e.type === 'dock' || e.type === 'launch'), false);
+});
+
 test('losing the ship ends the flight', () => {
   const {p, w} = quiet();
   w.damage(w.playerShip, 1e6, 1e6, null);
