@@ -18,11 +18,20 @@ try {
   page.on('console', e => { if (e.type() === 'error') errors.push(e.text()); });
   await page.addInitScript(() => {
     window.testPad = {index: 0, id: 'Synthetic standard controller', connected: true, mapping: 'standard', axes: [0, 0, 0, 0], buttons: Array.from({length: 17}, () => ({value: 0, pressed: false}))};
-    Object.defineProperty(navigator, 'getGamepads', {value: () => window.testPad ? [window.testPad] : []});
+    Object.defineProperty(navigator, 'getGamepads', {value: () => {
+      if (!window.testPad) return [];
+      const sample = {...testPad, buttons: testPad.buttons.map(b => ({...b}))};
+      // A tap is exactly one input sample, even when a slow render frame exceeds menu-repeat time.
+      if (window.testPulse) { window.testPulse = false; testPad.buttons = testPad.buttons.map(() => ({value: 0, pressed: false})); }
+      return [sample];
+    }});
   });
   const frames = (n = 5) => page.evaluate(n => new Promise(resolve => { const next = () => --n ? requestAnimationFrame(next) : resolve(); requestAnimationFrame(next); }), n);
   const hold = async buttons => { await page.evaluate(buttons => { for (let i = 0; i < testPad.buttons.length; i++) testPad.buttons[i] = {pressed: buttons.includes(i), value: buttons.includes(i) ? 1 : 0}; }, buttons); await frames(); };
-  const press = async i => { await hold([i]); await hold([]); };
+  const press = async i => {
+    await page.evaluate(i => { testPad.buttons = testPad.buttons.map((_, n) => ({value: n === i ? 1 : 0, pressed: n === i})); window.testPulse = true; }, i);
+    await frames(6);
+  };
   const mode = expected => page.waitForFunction(expected => __vagrant.mode === expected, expected);
   await page.goto(`${home}/VAGRANT_STARS/`); await page.waitForFunction(() => !!window.__vagrant); await frames();
   await press(0); await mode('docked'); // New captain through A, not a DOM click.
