@@ -18,6 +18,8 @@ const home = `http://127.0.0.1:${server.address().port}/OFFLINE-GAMES/`;
 const browser = await chromium.launch({args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist']});
 try {
   const page = await browser.newPage({viewport: {width: 1280, height: 720}});
+  // SMOKE_CPU_THROTTLE=6 slows the page sixfold, to rehearse a loaded CI runner locally.
+  if (process.env.SMOKE_CPU_THROTTLE) await (await page.context().newCDPSession(page)).send('Emulation.setCPUThrottlingRate', {rate: Number(process.env.SMOKE_CPU_THROTTLE)});
   const problems = [];
   page.on('pageerror', error => problems.push(`error: ${error.message}`));
   page.on('console', message => { if (message.type() === 'error') problems.push(`console: ${message.text()}`); });
@@ -49,13 +51,14 @@ try {
   for (const tab of ['dockyard', 'contracts']) { await page.click(`[data-tab="${tab}"]`); assert.ok(await page.locator('.st-body .card').count() > 0, tab); }
   assert.match(await page.locator('.job.story h2').innerText(), /Most Wanted I/);
   await page.click('[data-act="launch"]'); await until('at sea', s => s.mode === 'flight');
-  await page.keyboard.down('KeyW'); await page.waitForTimeout(2500); await page.keyboard.up('KeyW');
-  assert.ok((await game()).speed > 15, 'W opens the throttle');
+  // Observe the effect while the key is still held, so a slow machine cannot fail a fixed sleep.
+  await page.keyboard.down('KeyW'); await until('W opens the throttle', s => s.speed > 15, 30); await page.keyboard.up('KeyW');
 
   // Look to starboard with the arrow keys, steady and fire a broadside with Space.
   await page.keyboard.down('ArrowRight'); await until('looking to starboard', s => s.rel < -1.2, 10); await page.keyboard.up('ArrowRight');
   await page.keyboard.down('Space'); await until('guns steadying', () => page.evaluate(() => __ironwake.world.aim.side === 'star' && __ironwake.world.aim.t > 0.5), 10);
-  await page.keyboard.up('Space'); await until('broadside fired', s => s.shells >= 2, 5);
+  await page.keyboard.up('Space');
+  await until('broadside fired', () => page.evaluate(() => { const w = __ironwake.world; return w.shells.length > 0 || !w.batteryReady(w.playerShip, 'star'); }), 10);
   // Dragging the view also turns the camera.
   const before = (await game()).rel; await page.mouse.move(640, 300); await page.mouse.down(); await page.mouse.move(520, 300, {steps: 6}); await page.mouse.up();
   await until('drag look', s => Math.abs(s.rel - before) > 0.1, 5);

@@ -18,6 +18,8 @@ const home = `http://127.0.0.1:${server.address().port}/OFFLINE-GAMES/`;
 const browser = await chromium.launch({args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist']});
 try {
   const page = await browser.newPage({viewport: {width: 1280, height: 720}});
+  // SMOKE_CPU_THROTTLE=6 slows the page sixfold, to rehearse a loaded CI runner locally.
+  if (process.env.SMOKE_CPU_THROTTLE) await (await page.context().newCDPSession(page)).send('Emulation.setCPUThrottlingRate', {rate: Number(process.env.SMOKE_CPU_THROTTLE)});
   const problems = [];
   page.on('pageerror', error => problems.push(`error: ${error.message}`));
   page.on('console', message => { if (message.type() === 'error') problems.push(`console: ${message.text()}`); });
@@ -54,10 +56,12 @@ try {
   await page.click('[data-act="launch"]');
   await until('flight', s => s.mode === 'flight');
   await page.mouse.move(700, 340);
-  await page.keyboard.down('KeyW'); await page.waitForTimeout(2500); await page.keyboard.up('KeyW');
-  assert.ok((await game()).speed > 30, 'W opens the throttle');
-  await page.mouse.down(); await page.waitForTimeout(400); await page.mouse.up();
-  assert.ok(await page.evaluate(() => __vagrant.world.playerShip.energy < __vagrant.world.playerShip.maxEnergy), 'left mouse fires');
+  // Observe each effect while the input is still held: a slow machine must not turn a fixed
+  // sleep into a failure (gun energy recharges within half a second of releasing the trigger).
+  await page.keyboard.down('KeyW'); await until('W opens the throttle', s => s.speed > 30, 30); await page.keyboard.up('KeyW');
+  await page.mouse.down();
+  await until('left mouse fires', () => page.evaluate(() => __vagrant.world.bolts.size > 0 || __vagrant.world.playerShip.energy < __vagrant.world.playerShip.maxEnergy), 15);
+  await page.mouse.up();
 
   // Map, pause and resume.
   await page.keyboard.press('KeyM'); await until('map', s => s.mode === 'map', 5);
