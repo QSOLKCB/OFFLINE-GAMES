@@ -3,6 +3,7 @@
 import {Actions, attachKeyboard} from '../vendor/vanillajs/modules/input/index.js';
 import {FixedClock} from '../vendor/vanillajs/modules/time/index.js';
 import {quatInterpolate, rotate} from '../vendor/vanillajs/modules/math/index.js';
+import {PilotGamepad, ControllerMenu, idlePad, confirmNewCaptain} from './controller.js';
 import {Scene} from './render.js';
 import {drawHud, drawMap, mapPick} from './hud.js';
 import {StationUI} from './ui.js';
@@ -35,9 +36,11 @@ const saveSettings = () => store.set(SETTINGS_KEY, JSON.stringify(settings));
 
 const bindings = {KeyW: 'up', KeyS: 'down', KeyA: 'left', KeyD: 'right', ShiftLeft: 'burn', ShiftRight: 'burn', KeyX: 'brake',
   ArrowUp: 'pitchUp', ArrowDown: 'pitchDown', ArrowLeft: 'yawLeft', ArrowRight: 'yawRight', KeyC: 'cruise', KeyZ: 'drift', KeyF: 'use', KeyG: 'goto',
-  KeyR: 'hostile', KeyT: 'next', Tab: 'next', KeyN: 'poi', KeyY: 'pick', KeyB: 'tractor', KeyH: 'kit', KeyJ: 'cell', KeyQ: 'missile', KeyM: 'map',
+  KeyR: 'hostile', KeyT: 'next', Tab: 'next', KeyN: 'poi', KeyY: 'pick', KeyB: 'tractor', KeyH: 'kit', KeyJ: 'cell', KeyQ: 'missile', KeyM: 'map', KeyV: 'signal',
   Space: 'cursor', KeyP: 'pause', Escape: 'pause'};
 const actions = new Actions(), clock = new FixedClock({step: STEP, maxSteps: 6});
+const gamepad = new PilotGamepad(), padMenu = new ControllerMenu();
+let pad = idlePad(), padControl = false, hadPad = false;
 let mode = 'menu', world = null, player = null, backdrop = null, last = null, helpFrom = 'menu';
 let cursor = null, firing = false, pendingMissile = false, mouseFlight = true, shake = 0, lastAlert = 0, tipAt = 0, tipIndex = 0;
 const keyboard = attachKeyboard(window, actions, {bindings, enabled: () => mode === 'flight' || mode === 'map'});
@@ -47,7 +50,7 @@ const TIPS = ['Move the mouse to steer. Hold W to open the throttle; the wheel w
   'Slingway rings fling you across a system. Fold gates lead to other stars.'];
 
 function setMode(next) {
-  mode = next;
+  mode = next; gamepad.reset(); pad = idlePad();
   for (const [name, node] of Object.entries(overlays)) node.hidden = !((name === 'menu' && next === 'menu') || (name === 'help' && next === 'help') || (name === 'pause' && next === 'paused')
     || (name === 'dead' && next === 'dead') || (name === 'station' && next === 'docked'));
   clock.setPaused(next !== 'flight'); keyboard.clear(); firing = false; pendingMissile = false; last = null;
@@ -109,6 +112,7 @@ function drainEvents() {
       case 'jumpStart': audio.play('jump', {gain: 0.8}); flash.className = ''; flash.style.transition = 'opacity 1.5s ease-in'; flash.style.opacity = '1'; break;
       case 'jumped': flash.style.transition = 'opacity .9s ease-out'; flash.style.opacity = '0'; cam.q = [...world.playerShip.body.orientation]; break;
       case 'system': scene.setSystem(world.system); audio.setSystem(world.system.root); break;
+      case 'encounterDone': audio.play('dock', {gain: 0.6}); break;
       case 'missionDone':
         audio.play('dock', {gain: 0.7});
         say(`Contract complete: +${e.result.reward.toLocaleString('en-US')} cr`, 'good'); say(e.result.text, 'comm');
@@ -129,6 +133,7 @@ function edges() {
   if (actions.consume('map')) return setMode(mode === 'map' ? 'flight' : 'map');
   const w = world, inMap = mode === 'map';
   if (w.over) { actions.edges.clear(); return; } // a destroyed ship takes no orders
+  if (actions.consume('signal')) w.targetSignal();
   if (actions.consume('poi')) w.cyclePoi();
   if (actions.consume('use')) { w.use(); if (inMap) setMode('flight'); }
   if (actions.consume('goto')) { w.goTo(); if (inMap) setMode('flight'); }
@@ -148,12 +153,13 @@ const cursorRay = () => scene.ray(cursor.x / hud.clientWidth * 2 - 1, 1 - cursor
 function command() {
   const w = hud.clientWidth, h = hud.clientHeight, turn = [actions.axis('pitchDown', 'pitchUp'), actions.axis('yawRight', 'yawLeft')];
   let aim = null;
-  if (cursor) {
+  if (padControl) { turn[0] += pad.turn[0]; turn[1] += pad.turn[1]; aim = world.forward(world.playerShip); }
+  if (cursor && !padControl) {
     aim = cursorRay();
     const mx = (cursor.x - w / 2) / (h / 2), my = (h / 2 - cursor.y) / (h / 2), r = Math.hypot(mx, my);
     if (mouseFlight && r > 0.05) { const k = Math.min(1, (r - 0.05) * 1.5) / r; turn[0] += my * k; turn[1] -= mx * k; }
   }
-  return {turn, throttle: actions.axis('down', 'up'), strafe: actions.axis('left', 'right'), burn: !!actions.value('burn'), brake: !!actions.value('brake'), fire: firing, aim, missile: false};
+  return {turn, throttle: actions.axis('down', 'up') + pad.throttle, strafe: Math.max(-1, Math.min(1, actions.axis('left', 'right') + pad.strafe)), burn: !!actions.value('burn') || pad.held.has('burn'), brake: !!actions.value('brake') || pad.held.has('brake'), fire: firing || pad.held.has('fire'), aim, missile: false};
 }
 hud.addEventListener('pointermove', e => { cursor = {x: e.clientX, y: e.clientY}; });
 hud.addEventListener('pointerdown', e => {
@@ -177,13 +183,40 @@ window.addEventListener('blur', () => { if (mode === 'flight' || mode === 'map')
 document.addEventListener('visibilitychange', () => { if (document.hidden && (mode === 'flight' || mode === 'map')) setMode('paused'); });
 document.addEventListener('keydown', e => { if (e.code === 'Escape' && mode === 'paused') { e.preventDefault(); setMode('flight'); } else if (e.code === 'Escape' && mode === 'help') closeHelp(); });
 
+// Controller samples are taken even while simulation is paused or docked.
+for (const event of ['pointermove', 'pointerdown', 'keydown']) window.addEventListener(event, () => { padControl = false; });
+function pollController(now) {
+  const dialog = document.querySelector('dialog[open]');
+  let pads = [];
+  try { pads = navigator.getGamepads?.() ?? []; } catch { /* permissions policy / unsupported browser */ }
+  pad = gamepad.sample(pads, document.hidden || !document.hasFocus() ? 'inactive' : dialog ? 'confirm' : mode, now);
+  if (document.hidden || !document.hasFocus()) { gamepad.reset(); pad = idlePad(); return; }
+  if (hadPad && !pad.connected && padControl && (mode === 'flight' || mode === 'map')) {
+    setMode('paused'); say('Controller disconnected. Reconnect, release controls, then resume.', 'warn');
+  }
+  hadPad = pad.connected;
+  if (pad.active) { padControl = true; audio.unlock(); }
+  $('pad-status').textContent = pad.connected ? (gamepad.armed ? 'Controller connected · A select · D-pad navigate · Menu pause' : 'Controller connected · release all controls to arm') : 'Controller: press a button to connect';
+  if (mode === 'flight' || mode === 'map') {
+    if (mode === 'map' && pad.pressed.has('brake')) { setMode('flight'); return; }
+    for (const name of pad.pressed) if (!['fire', 'burn', 'brake'].includes(name)) actions.edges.add(name);
+  } else {
+    const root = dialog ?? overlays[mode === 'paused' ? 'pause' : mode === 'docked' ? 'station' : mode];
+    padMenu.step(pad, root, () => {
+      if (dialog) dialog.close();
+      else if (mode === 'paused') setMode('flight');
+      else if (mode === 'help') closeHelp();
+    });
+  }
+}
+
 // Menus --------------------------------------------------------------------------------------
 const refreshMenu = () => { $('btn-continue').hidden = !loadSave(); };
 const closeHelp = () => setMode(helpFrom);
 $('btn-new').addEventListener('click', () => {
   audio.unlock();
-  if (loadSave() && !confirm('Start a new captain? Your saved game will be replaced.')) return;
-  begin(newPlayer((Date.now() & 0x7fffffff) || 1), true);
+  const start = () => begin(newPlayer((Date.now() & 0x7fffffff) || 1), true);
+  if (loadSave()) confirmNewCaptain(start); else start();
 });
 $('btn-continue').addEventListener('click', () => { audio.unlock(); const state = loadSave(); if (state) begin(state, false); else refreshMenu(); });
 $('btn-help').addEventListener('click', () => { helpFrom = 'menu'; setMode('help'); });
@@ -216,6 +249,7 @@ function frame(now) {
   requestAnimationFrame(frame);
   const seconds = last === null ? 0 : Math.min(0.25, (now - last) / 1000);
   last = now;
+  pollController(now);
   if (mode === 'docked') {
     const port = world.sector.byId.get(world.docked), a = 2.2 + (reducedMotion ? 0 : now / 1000 * 0.012), distance = port.radius * 3.8;
     updatePoses(world, 1);
@@ -263,8 +297,8 @@ function frame(now) {
   sizeHud();
   const target = world.targetObject();
   const hint = target && !target.body && !me.lane && !world.jump && Math.hypot(...target.pos.map((v, i) => v - me.body.position[i])) <= target.useRange
-    ? `Press F to ${target.type === 'base' ? 'dock' : target.type === 'gate' ? 'jump' : 'ride the slingway'}` : me.lane ? 'Press F or X to leave the slingway' : null;
-  const ui = {cursor, mouseFlight, firing, messages, poses, hint};
+    ? `Press F to ${target.type === 'base' ? 'dock' : target.type === 'gate' ? 'jump' : target.type === 'signal' ? 'approach the signal' : 'ride the slingway'}` : me.lane ? 'Press F or X to leave the slingway' : null;
+  const ui = {cursor: padControl ? {x: hud.clientWidth / 2, y: hud.clientHeight / 2} : cursor, mouseFlight: mouseFlight && !padControl, firing: firing || pad.held.has('fire'), messages, poses, hint: padControl ? 'A interact · Y hostile · RS signal · RB cruise · View map · Menu pause' : hint};
   if (mode === 'map') drawMap(ctx, hud.clientWidth, hud.clientHeight, world, ui); else drawHud(ctx, hud.clientWidth, hud.clientHeight, world, scene, ui);
   const power = me.lane ? 3 : me.cruise.state === 'on' ? 2.4 : me.burning ? 1.7 : me.throttle;
   audio.update(mode === 'flight', power, world.contacts().some(c => c.attitude === 'hostile' && c.dist < 2600) ? 1 : 0, world);

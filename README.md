@@ -24,6 +24,14 @@ Right-click selects an enemy; Q fires missiles/torpedoes and IRONWAKE uses E for
 its deflector. See [the presentation notes](docs/PRESENTATION.md) for the changes,
 VANILLAJS/OPT provenance, resource bounds and validation commands.
 
+## VAGRANT STARS free roam and controllers
+
+VAGRANT STARS now follows a recurring scout patrol → freighter rescue → ace
+encounter arc, with marked signals, payouts and time to salvage/refit. Standard
+Xbox/PlayStation-mapped controllers support flight, combat, navigation and menus.
+Slingway arrival selects the destination port so docking no longer sends you back
+to the boarding ring. See [controls and gameplay notes](docs/VAGRANT-FREE-ROAM.md).
+
 ## Run locally
 
 ```bash

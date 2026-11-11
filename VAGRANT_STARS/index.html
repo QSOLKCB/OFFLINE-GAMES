@@ -13,6 +13,7 @@
 <body>
 <canvas id="view" aria-label="Space view"></canvas>
 <canvas id="hud" tabindex="0" aria-label="Flight display. Mouse steers, keyboard flies."></canvas>
+<p id="pad-status" aria-live="polite">Controller: press a button to connect</p>
 <div id="flash" aria-hidden="true"></div>
 
 <section id="menu" class="overlay">
@@ -25,7 +26,7 @@
       <button id="btn-new" class="primary">New captain</button>
       <button id="btn-help">How to fly</button>
     </div>
-    <p class="small" id="menu-note">Mouse and keyboard. Runs offline once loaded. Progress is saved in this browser.</p>
+    <p class="small" id="menu-note">Mouse, keyboard or standard game controller. Runs offline once loaded. Progress is saved in this browser.</p>
     <p class="small"><a href="../">◂ All offline games</a></p>
   </div>
 </section>
@@ -62,6 +63,10 @@
         <li><kbd>Esc</kbd> or <kbd>P</kbd> pause</li>
       </ul></div>
     </div>
+    <h3>Controller — Xbox / PlayStation standard mapping</h3>
+    <p class="small">Left stick: throttle / strafe. Right stick: steer. RT/R2: guns. LT/L2: afterburner. A/Cross: interact. B/Circle: brake. X/Square: missile. Y/Triangle: nearest hostile. LB/L1: next ship. RB/R1: cruise. Left stick click: drift. Right stick click: select signal. D-pad up/down: hull patch/shield cell; left/right: next place/tractor. View/Share: map. Menu/Options: pause.</p>
+    <p class="small">Menus: D-pad up/down selects, A/Cross activates, B/Circle goes back. D-pad left/right changes dock tabs or a focused volume slider. Release all controls after connecting, changing screens or resuming. Some browsers need one click or keypress to enable audio.</p>
+    <p class="small">Free roam: scouts → freighter rescue → route leader. Follow the purple signal; V selects it and F approaches. Salvage and refit between encounters. Contracts pause new free-roam signals.</p>
     <button class="primary" data-close>Back</button>
   </div>
 </section>

@@ -81,10 +81,10 @@ export class StationUI {
       ${this.notice ? `<section class="card notice"><h2>${esc(this.notice.title)}</h2><p>${esc(this.notice.text)}</p></section>` : ''}
       <div class="cols">
         <section class="card"><h2>The concourse</h2><p>${esc(b.about)}</p><p class="rumor">Overheard: “${esc(rumor)}”</p>
-          <h3>Captain's log</h3>
+          <h3>Captain's log</h3><p>Free-roam signals cleared: ${p.patrols ?? 0}. Next: ${['scout patrol', 'freighter rescue', 'route leader'][(p.patrols ?? 0) % 3]}.</p>
           <p>Rank ${levelOf(p)} · net worth ${cr(netWorth(p))}${next ? ` · next rank at ${cr(next)}` : ''}</p>
           <p>${p.stats.kills} ships destroyed · ${p.stats.missions} contracts · ${p.stats.jumps} jumps · storyline ${Math.min(p.story, STORY.length)}/${STORY.length}</p>
-          <p>${p.mission ? `Active contract: ${esc(missionObjective(p))}` : 'No active contract. See the Contracts tab.'}</p></section>
+          <p>${p.mission ? `Active contract: ${esc(missionObjective(p))}` : 'Free roam: clear scouts, answer a distress call, then hunt the route leader. Signals arrive after launch; contracts are optional.'}</p></section>
         <section class="card"><h2>Standing</h2><table class="grid">${reps}</table>
           <p class="small">Factions open fire when you are Hostile and close their ports when you are Hunted. Destroying a faction's enemies improves your name with it.</p></section>
       </div>`;

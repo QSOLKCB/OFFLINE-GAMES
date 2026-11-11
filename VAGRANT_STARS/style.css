@@ -84,3 +84,9 @@ td.acts button { padding:3px 9px; font-size:12.5px; margin-left:4px; }
 .st-foot { background:rgba(3,10,20,.88); padding:14px; border:1px solid var(--line); border-radius:6px; }
 #menu .menu-card { padding:36px 26px; background:linear-gradient(135deg, #07111ddd, #07111d66); border:1px solid var(--line); border-top:2px solid var(--accent); backdrop-filter:blur(3px); }
 @media (max-width:640px) { .st-head { min-height:120px; } }
+
+/* Controller focus is visible independently of the browser's input heuristics. */
+button:focus, a:focus, input:focus { outline: 2px solid #8fe7ff; outline-offset: 3px; }
+#pad-status { position: fixed; bottom: 2px; left: 50%; transform: translateX(-50%); z-index: 20; margin: 0; padding: 3px 8px; color: #b3d6ea; background: #081221dc; font: 10px system-ui; pointer-events: none; white-space: nowrap; }
+.captain-confirm { color: #dcefff; background: #0a1727; border: 1px solid #7fc8ff; border-radius: 10px; max-width: 440px; padding: 24px; }
+.captain-confirm::backdrop { background: #000b; }

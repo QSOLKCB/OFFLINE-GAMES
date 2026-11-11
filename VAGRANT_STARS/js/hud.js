@@ -130,7 +130,7 @@ export function drawHud(ctx, w, h, world, scene, ui) {
   label(ctx, `${world.system.name.toUpperCase()} SYSTEM`, 18, 26, '#eaf4ff', 14, 'left');
   const zone = world.zoneAt(mePos, 'nebula') ?? world.zoneAt(mePos, 'rocks');
   label(ctx, `${fmtCr(p.credits)}   Cargo ${cargoUsed(p)}/${me.hull.cargo}   Rank ${levelOf(p)}${zone ? `   ${zone.name}` : ''}`, 18, 44, C.neutral, 12, 'left');
-  const objective = missionObjective(p);
+  const objective = missionObjective(p) ?? world.encounters.objective();
   if (objective) label(ctx, `◆ ${objective}`, 18, 64, C.way, 12, 'left');
 
   // Contacts list (top right).
@@ -152,9 +152,9 @@ export function drawHud(ctx, w, h, world, scene, ui) {
     } else {
       const d = dist3(mePos, target.pos), near = d <= target.useRange;
       label(ctx, target.name, tx + 10, ty + 18, C.poi, 13, 'left');
-      label(ctx, target.type === 'base' ? `${FACTIONS[target.faction].name}` : target.type === 'gate' ? 'Fold gate' : 'Slingway ring', tx + 10, ty + 34, C.dim, 10, 'left');
+      label(ctx, target.type === 'base' ? `${FACTIONS[target.faction].name}` : target.type === 'gate' ? 'Fold gate' : target.type === 'signal' ? 'Free-roam encounter' : 'Slingway ring', tx + 10, ty + 34, C.dim, 10, 'left');
       label(ctx, `Range ${fmtDist(d)}`, tx + 10, ty + 52, C.neutral, 11, 'left');
-      label(ctx, near ? `[F] ${target.type === 'base' ? 'Dock' : target.type === 'gate' ? 'Jump' : 'Ride'}` : '[F] Approach and use   [G] Go to', tx + 10, ty + 68, near ? C.friendly : C.dim, 11, 'left');
+      label(ctx, near ? `[F] ${target.type === 'base' ? 'Dock' : target.type === 'gate' ? 'Jump' : target.type === 'signal' ? 'Approach' : 'Ride'}` : '[F] Approach and use   [G] Go to', tx + 10, ty + 68, near ? C.friendly : C.dim, 11, 'left');
     }
   }
   // Messages.

@@ -101,3 +101,18 @@ through its interface in a real browser.
 
 VAGRANT STARS is an original game in the space trading and combat genre. See
 [`NOTICE.md`](NOTICE.md) for what it does and does not contain.
+
+## Living trade routes and controller support
+
+Free roam now has recurring scout attacks, freighter rescues and a named ace with
+wingmen. Purple signals supply optional objectives and bonuses, with recovery
+windows between encounters. Press **V** to select a signal, **F** to approach, or
+**R** to target the nearest hostile. The story and station contracts remain available.
+
+Standard Xbox/PlayStation-mapped controllers support flight, weapons and menus.
+Open **How to fly** for the complete mapping; release controls after connecting
+or changing screens. A click or keypress may be required to unlock audio.
+
+Slingway arrival now selects the destination station/gate, so the next interaction
+continues docking rather than turning back toward the boarding ring.
+See [gameplay, provenance and test notes](../docs/VAGRANT-FREE-ROAM.md).

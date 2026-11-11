@@ -15,7 +15,7 @@ execFileSync(process.execPath, [join(root, 'scripts/site.mjs'), 'build', `${stag
 const server = createStaticServer(join(root, stage));
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const home = `http://127.0.0.1:${server.address().port}/OFFLINE-GAMES/`;
-const browser = await chromium.launch({args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist']});
+const browser = await chromium.launch({executablePath: process.env.CHROMIUM_EXECUTABLE_PATH || undefined, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist']});
 try {
   const page = await browser.newPage({viewport: {width: 1280, height: 720}});
   // SMOKE_CPU_THROTTLE=6 slows the page sixfold, to rehearse a loaded CI runner locally.

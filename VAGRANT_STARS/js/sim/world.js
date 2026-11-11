@@ -8,8 +8,10 @@ import {leadIntercept} from '../../vendor/vanillajs/modules/lead-solver/index.js
 import {createInteractionResolver} from '../../vendor/vanillajs/modules/interactions/index.js';
 import {FACTIONS, SYSTEMS, HULLS, GUNS, LAUNCHERS, SHIELDS, CONSUMABLES, GOODS, TIERS, HOSTILE_REP, REFUSE_REP, factionsAtWar, enemiesOf, pilotName, routeBetween} from './data.js';
 import {shipModel, stationBoxes, STATION_RADIUS, scatterRocks} from './models.js';
-import {cargoFree, adjustRep} from './player.js';
+import {cargoFree, adjustRep, levelOf} from './player.js';
 import {completeMission, missionOnDock} from './missions.js';
+import {EncounterDirector, AMBIENT_LIMIT, nearestHostile} from './encounters.js';
+import {ATMOSPHERE_SCALE, STELLAR_HEAT_SCALE} from './hazards.js';
 import {thinkNpc, steerToward} from './ai.js';
 
 export const CRUISE_CHARGE = 3.5, BOOST_TIME = 5, BOOST_RECHARGE = 9, LANE_SPEED = 2600, SENSOR = 6000, JUMP_TIME = 1.7;
@@ -120,6 +122,7 @@ export class World {
     this.system = SYSTEMS[systemId]; this.sector = buildSector(this.system);
     this.ships = []; this.byId = new Map(); this.shots = new ProjectileSystem({capacity: 320}); this.bolts = new Map();
     this.missiles = []; this.loot = []; this.target = null; this.auto = null; this.jump = null; this.docked = null;
+    this.encounters = new EncounterDirector(this);
     this.spawnT = 2; this.tractorT = 0; this.groupId = 0; this.hazardT = 0;
     p.system = systemId; p.visited[systemId] = true;
     if (p.mission) p.mission.spawned = false;
@@ -206,6 +209,7 @@ export class World {
   targetObject() {
     const t = this.target;
     if (!t) return null;
+    if (t.kind === 'signal') { const e = this.encounters.active; return e ? {id: 'signal', type: 'signal', name: e.title, pos: e.pos, radius: 50, useRange: 400} : null; }
     if (t.kind === 'ship') { const s = this.byId.get(t.id); return s && s.alive ? s : null; }
     return this.sector.byId.get(t.id) ?? null;
   }
@@ -223,7 +227,7 @@ export class World {
   /** The marker the active contract points at inside this system. */
   waypoint() {
     const m = this.player.mission;
-    if (!m) return null;
+    if (!m) return this.encounters.waypoint();
     if (m.system === this.system.id) {
       if (m.kind === 'bounty') return {pos: m.waypoint, label: 'Contract target'};
       const poi = this.sector.byId.get(m.base);
@@ -248,10 +252,15 @@ export class World {
     return next;
   }
   targetNearestHostile() {
-    const hostile = this.contacts().find(c => c.attitude === 'hostile');
-    this.target = hostile ? {kind: 'ship', id: hostile.ship.id} : this.target;
+    const hostile = nearestHostile(this, SENSOR);
+    this.target = hostile ? {kind: 'ship', id: hostile.id} : this.target;
     if (!hostile) this.note('No hostiles on scope.');
-    return hostile?.ship ?? null;
+    return hostile;
+  }
+  targetSignal() {
+    if (!this.encounters.active) return this.note('No active free-roam signal. Watch the traffic-control channel.');
+    this.target = {kind: 'signal', id: 'signal'};
+    this.note('Signal selected. Press F to approach, or steer toward the purple beacon.');
   }
   targetPoi(id) { if (this.sector.byId.has(id)) this.target = {kind: 'poi', id}; }
   /** Select the ship or place nearest to a view ray (the cursor). */
@@ -320,10 +329,17 @@ export class World {
   use() {
     if (this.over || this.docked || this.jump) return;
     const ship = this.playerShip, me = ship.body.position;
-    if (ship.lane) return this.#exitLane(ship, true);
+    if (ship.lane) {
+      const selected = this.targetObject();
+      this.#exitLane(ship, true);
+      // An explicit station/gate order survives leaving the lane.
+      if (!selected || selected.body || selected.type === 'ring') return;
+    }
+    if (this.target?.kind === 'signal') return this.goTo();
     let poi = this.target?.kind === 'poi' ? this.sector.byId.get(this.target.id) : null;
     if (!poi) {
-      poi = this.sector.pois.filter(p => dist(me, p.pos) < p.useRange + 1800).sort((a, b) => dist(me, a.pos) - a.useRange - dist(me, b.pos) + b.useRange)[0] ?? null;
+      const dockable = this.sector.pois.filter(p => p.type === 'base' && dist(me, p.pos) <= p.useRange);
+      poi = (dockable.length ? dockable : this.sector.pois.filter(p => dist(me, p.pos) < p.useRange + 1800)).sort((a, b) => dist(me, a.pos) - a.useRange - dist(me, b.pos) + b.useRange)[0] ?? null;
       if (!poi) return this.note('Nothing to dock with nearby. Select a station, gate or ring.');
       this.target = {kind: 'poi', id: poi.id};
     }
@@ -366,6 +382,16 @@ export class World {
     ship.throttle = 0.6; ship.lane = null;
     this.events.push({type: 'laneExit'});
     if (early) this.note('Slingway released.');
+    else if (ship.isPlayer) {
+      const selected = this.targetObject();
+      // The boarding ring is stale after arrival: F should approach the destination,
+      // not turn around and board that same lane again. Preserve other explicit targets.
+      if (!selected || selected.type === 'ring' && selected.lane === lane) {
+        const destination = dir > 0 ? lane.to : lane.from;
+        this.target = {kind: 'poi', id: destination.id};
+        this.note(`Arrived off ${destination.name}. Press F to approach and ${destination.type === 'base' ? 'dock' : 'jump'}.`, 'good');
+      }
+    }
   }
 
   launchMissile(ship, target) {
@@ -426,6 +452,7 @@ export class World {
     this.#stepLoot(dt);
     this.#stepMission();
     this.#hazards(dt);
+    this.encounters.step(dt);
     this.#spawner(dt);
     if (this.ships.some(s => !s.alive || s.gone)) {
       for (const s of this.ships) if (!s.alive || s.gone) this.byId.delete(s.id);
@@ -525,6 +552,7 @@ export class World {
       victim.shield -= shieldDamage;
       if (victim.shield <= 0) { victim.hp += victim.shield * (hullDamage / Math.max(1, shieldDamage)); victim.shield = 0; if (victim.isPlayer) this.note('Shields down!', 'warn'); }
     } else victim.hp -= hullDamage;
+    if (source?.isPlayer && victim.encounter) victim.encounterHit = true;
     if (source) {
       victim.lastHitBy = source.id;
       if (victim.ai) { victim.ai.attacker = source.id; if (victim.ai.role === 'trader' && victim.ai.state !== 'flee') { victim.ai.state = 'flee'; victim.ai.fleeT = 16; } }
@@ -660,7 +688,7 @@ export class World {
 
   #autopilot(control) {
     const ship = this.playerShip, auto = this.auto, t = auto.target;
-    const obj = t.kind === 'ship' ? this.byId.get(t.id) : this.sector.byId.get(t.id);
+    const obj = t.kind === 'signal' ? this.encounters.active && {pos: this.encounters.active.pos, radius: 250} : t.kind === 'ship' ? this.byId.get(t.id) : this.sector.byId.get(t.id);
     if (!obj || (obj.body && !obj.alive)) return this.stopAuto();
     if (ship.lane) return;
     const pos = obj.body ? obj.body.position : obj.pos, to = sub(pos, ship.body.position), d = len(to);
@@ -696,30 +724,46 @@ export class World {
   #hazards(dt) {
     const ship = this.playerShip, pos = ship.body.position, star = this.system.star, d = dist(pos, star.pos);
     this.hazardT -= dt;
-    if (d < star.radius * 1.7) {
-      this.damage(ship, 90 * dt * (1.7 - d / star.radius) * 3, 140 * dt, null);
+    if (d < star.radius * STELLAR_HEAT_SCALE) {
+      this.damage(ship, 90 * dt * (STELLAR_HEAT_SCALE - d / star.radius) * 3, 140 * dt, null);
       if (this.hazardT <= 0) { this.hazardT = 4; this.note('Hull temperature critical. Pull away from the star!', 'warn'); }
     }
     for (const planet of this.system.planets) {
       const to = sub(pos, planet.pos), r = len(to);
-      if (r > planet.radius * 1.03) continue;
-      ship.body.position = addScaled(planet.pos, to.map(v => v / r), planet.radius * 1.03);
+      if (r > planet.radius * ATMOSPHERE_SCALE) continue;
+      ship.body.position = addScaled(planet.pos, to.map(v => v / r), planet.radius * ATMOSPHERE_SCALE);
       this.#dropCruise(ship); if (ship.lane) this.#exitLane(ship, true);
       this.damage(ship, 160 * dt, 240 * dt, null);
       if (this.hazardT <= 0) { this.hazardT = 4; this.note('Atmospheric burn! Climb out!', 'warn'); }
     }
   }
 
+  /** Free-roam pilot arc: dogfight, rescue, then a named ace and wingmen. */
+  startEncounter(stage, pos) {
+    const rank = Math.min(4, Math.floor((this.player.patrols ?? 0) / 3), Math.floor((levelOf(this.player) - 1) / 2));
+    const tier = Math.min(5, 1 + rank + (this.system.danger >= 3 ? 1 : 0));
+    const wards = [];
+    if (stage === 1) {
+      const group = this.spawnGroup({faction: 'halcyon', role: 'trader', count: 1, tier: 1, pos: [pos[0] + 420, pos[1], pos[2]], dest: pos});
+      const ward = this.shipById(group.leader); ward.encounterWard = true; ward.name = 'Halcyon Relief Flight'; wards.push(ward);
+    }
+    const group = this.spawnGroup({faction: 'reavers', role: 'raider', count: stage === 0 ? 2 : 3, tier, pos, dest: [...this.playerShip.body.position]});
+    const enemies = this.ships.filter(s => s.ai?.group === group.id);
+    for (const s of enemies) { s.provoked = true; s.ai.sense = 3600; s.ai.brave = true; if (wards.length) s.ai.target = wards[0].id; }
+    if (stage === 2) { const ace = enemies[0]; ace.name = 'Reaver Lane Reaper'; ace.boss = true; ace.hp = ace.maxHp = Math.round(ace.maxHp * 1.4); }
+    return {enemies, wards, reward: (stage === 2 ? 1500 : stage === 1 ? 1000 : 600) * (rank + 1)};
+  }
+
   // Traffic ----------------------------------------------------------------------------------
   #spawner(dt) {
     const me = this.playerShip;
-    for (const s of this.ships) if (!s.isPlayer && !s.missionTag && this.distance(s, me) > 8000) s.gone = true;
+    for (const s of this.ships) if (!s.isPlayer && !s.missionTag && !s.encounter && this.distance(s, me) > 8000) s.gone = true;
     this.spawnT -= dt;
     if (this.spawnT > 0) return;
     this.spawnT = 3.5 + this.rng() * 3.5;
     if (me.lane || !this.traffic) return;
-    const groups = new Set(this.ships.filter(s => s.ai && !s.missionTag).map(s => s.ai.group));
-    if (groups.size >= (this.system.danger > 3 ? 4 : 3)) return;
+    const ambient = this.ships.filter(s => s.ai && s.alive && !s.gone && !s.missionTag && !s.encounter);
+    if (ambient.length >= AMBIENT_LIMIT - 5 || new Set(ambient.map(s => s.ai.group)).size >= 4) return;
     this.#spawnTraffic(2800 + this.rng() * 800);
   }
   #spawnTraffic(range) {
@@ -771,7 +815,7 @@ export class World {
   /** Called by the AI when a travelling ship reaches its destination. */
   npcArrived(ship) {
     const ai = ship.ai, r = this.rng;
-    if (ai.role === 'trader') { ship.gone = true; return; }
+    if (ai.role === 'trader' && !ship.encounterWard) { ship.gone = true; return; }
     if (ai.role === 'patrol') {
       const places = this.sector.pois.filter(p => p.type !== 'ring');
       ai.dest = [...places[Math.floor(r() * places.length)].pos]; ai.arrive = 700;
