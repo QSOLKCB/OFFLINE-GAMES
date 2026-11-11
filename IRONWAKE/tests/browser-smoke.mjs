@@ -8,7 +8,7 @@ import {createRequire} from 'node:module';
 import {join} from 'node:path';
 import {createStaticServer} from '../../scripts/serve.mjs';
 import {root} from '../../scripts/site.mjs';
-import {waitForState} from '../../tests/browser-wait.mjs';
+import {installGameClock, waitForState} from '../../tests/browser-wait.mjs';
 
 const {chromium} = createRequire(import.meta.url)('playwright');
 const stage = '_site_smoke_ironwake';
@@ -19,6 +19,7 @@ const home = `http://127.0.0.1:${server.address().port}/OFFLINE-GAMES/`;
 const browser = await chromium.launch({args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist']});
 try {
   const page = await browser.newPage({viewport: {width: 1280, height: 720}});
+  await installGameClock(page);
   // SMOKE_CPU_THROTTLE=6 slows the page sixfold, to rehearse a loaded CI runner locally.
   if (process.env.SMOKE_CPU_THROTTLE) await (await page.context().newCDPSession(page)).send('Emulation.setCPUThrottlingRate', {rate: Number(process.env.SMOKE_CPU_THROTTLE)});
   const problems = [];
@@ -26,19 +27,21 @@ try {
   page.on('console', message => { if (message.type() === 'error') problems.push(`console: ${message.text()}`); });
   page.on('response', response => { if (response.status() >= 400) problems.push(`${response.status()} ${response.url()}`); });
   page.on('request', request => { if (!request.url().startsWith(home) && !request.url().startsWith('data:')) problems.push(`left the site: ${request.url()}`); });
+  // Module loading uses real time; the paused animation clock cannot make it finish.
+  const initialized = () => waitForState('IRONWAKE initialized', () => page.evaluate(() => !!globalThis.__ironwake), Boolean, 30);
   const game = () => page.evaluate(() => {
     const g = globalThis.__ironwake, w = g.world, s = w?.playerShip;
-    return {mode: g.mode, docked: w?.docked ?? null, speed: s ? Math.hypot(s.body.velocity[0], s.body.velocity[2]) : 0, warp: s?.warp.state, shells: w?.shells.length ?? 0, ships: w?.ships.length ?? 0,
+    return {mode: g.mode, time: w?.time, docked: w?.docked ?? null, speed: s ? Math.hypot(s.body.velocity[0], s.body.velocity[2]) : 0, warp: s?.warp.state, shells: w?.shells.length ?? 0, ships: w?.ships.length ?? 0,
       cargo: g.player?.cargo, credits: g.player?.credits, drawn: g.scene.far.n + g.scene.near.n, rel: g.view.rel};
   });
-  const until = (label, check, seconds = 40) => waitForState(label, game, check, seconds, ms => page.waitForTimeout(ms));
+  const until = (label, check, seconds = 40) => waitForState(label, game, check, seconds, ms => page.clock.runFor(ms));
 
   // Collection page: both games are offered, and the IRONWAKE link opens it.
   await page.goto(home);
   assert.deepEqual(await page.locator('a.button').evaluateAll(links => links.map(a => a.getAttribute('href'))), ['VAGRANT_STARS/', 'IRONWAKE/']);
   assert.ok(await page.locator('.shot img').evaluateAll(images => images.every(img => img.complete && img.naturalWidth > 0)), 'both screenshots load');
   await page.click('a.button[href="IRONWAKE/"]');
-  await page.waitForSelector('#btn-new'); await page.waitForTimeout(600);
+  await page.waitForSelector('#btn-new'); await initialized(); await page.clock.runFor(600);
   assert.match(await page.title(), /IRONWAKE/); assert.ok((await game()).drawn > 0, 'the title backdrop is rendering');
 
   // New captain: trade, look over the dockyard, cast off.
@@ -75,7 +78,7 @@ try {
   assert.match(await page.locator('.st-head h1').innerText(), /Coldharbor Exchange/);
 
   // The docked state is saved: reload and continue. Then lose the ship and return to port.
-  await page.reload(); await page.waitForSelector('#btn-continue:not([hidden])'); await page.click('#btn-continue'); await page.waitForSelector('.st-shell');
+  await page.reload(); await initialized(); await page.waitForSelector('#btn-continue:not([hidden])'); await page.click('#btn-continue'); await page.waitForSelector('.st-shell');
   assert.match(await page.locator('.st-head h1').innerText(), /Coldharbor Exchange/); assert.equal((await game()).cargo.water, 10);
   await page.click('[data-act="launch"]'); await until('at sea again', s => s.mode === 'flight');
   await page.evaluate(() => __ironwake.world.damage(__ironwake.world.playerShip, 1e7, 0, 0, null));

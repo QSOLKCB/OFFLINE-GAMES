@@ -1,6 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 import assert from 'node:assert/strict';
 
+/** Install before navigation. runFor fires every animation frame, so the game's
+ * fixed clock gets the same ticks even when a CI renderer takes longer to draw.
+ * fastForward would skip frames and trigger the game's catch-up limit again.
+ */
+export async function installGameClock(page) {
+  await page.clock.install({time: new Date('2024-01-01T00:00:00Z')});
+  await page.clock.pauseAt(new Date('2024-01-01T00:01:00Z'));
+}
+
 /** Poll through the entire wait budget, including the state after the last pause.
  * Report the last checked sample on failure; an extra, unchecked read can show
  * success in the error message and still incorrectly fail the smoke test.
