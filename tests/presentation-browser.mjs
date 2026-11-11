@@ -98,3 +98,5 @@ try {
 // Keep the established CI entry point covering the default CPU path as well as
 // the explicit legacy WebGL presentation checks above.
 await import('./visual-overhaul-browser.mjs');
+
+await import('./render-regressions-browser.mjs');

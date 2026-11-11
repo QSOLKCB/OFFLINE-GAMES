@@ -33,13 +33,19 @@ No mod guide or mod hooks implement the campaign.
 
 The title screen probes `requestAdapter` and rejects a reported fallback adapter.
 It offers acceleration only when an adapter and WebAssembly support exist.
-Detection does not start rendering or create a device. Clicking Enable lazily
+Detection does not start rendering or create a device. Each Enable attempt
+requests a fresh adapter, including retries after device loss. Clicking Enable lazily
 imports the backend, creates its device and instantiates the bundled WASM bytes.
 Neither acceleration nor its consent is persisted across reloads.
 
 WASM projects the bounded packed streams into clip-space XYZ/W/RGB; WebGPU
 rasterizes triangles, lines and points with depth and additive passes. The CPU
-canvas supplies the procedural sky and planet background. Sixteen MiB of fixed
+canvas supplies the procedural sky and planet background. A final opaque GPU
+composition combines that background with an offscreen scene texture. Additive
+effects add RGB without changing scene coverage; black glow rims leave the
+background intact. Both textures are reused and released on resize/disposal. The background
+retains the 960-pixel CPU cap while geometry keeps its independent GPU resolution,
+limiting the CPU-to-GPU upload cost. This adds one background upload and one full-screen pass. Sixteen MiB of fixed
 WASM memory bounds staging; GPU buffers grow only to each bounded stream's size
 and are reused. System-change sky buffers are released. Initialization errors,
 uncaptured device errors, synchronous draw errors and device loss return to the
@@ -117,3 +123,25 @@ Only decorative sampling is used; no claim of an N-body or astrophysical game
 simulation is made. No remote assets, accounts, services or runtime dependencies
 were introduced. Shared files are included in the static build and service-worker
 inventory. Distribute the complete repository/site, including `shared/`.
+
+## Rendering regression fixes
+
+VAGRANT STARS now finalizes each frame before returning its haze value. Checks
+assert one submission and inspect actual GPU pixels, rather than treating an
+"enabled" backend label as proof that geometry was drawn.
+
+Nearby planets use ray/sphere surface intersections in a reusable image bounded
+to 320 pixels on either axis. This handles the camera-plane crossing and views
+inside the atmosphere; only spheres entirely behind the camera are rejected.
+Distant planets keep the cached billboard path. Surface texture projection near
+a planet is approximate; simulation collisions and damage are unchanged.
+
+`node tests/render-regressions-browser.mjs` runs CPU surface-visibility, frame
+finalization and single-use adapter UI fixtures. It runs from the existing CI
+presentation entry point. `TEST_HARDWARE_GPU=1 node tests/render-regressions-browser.mjs`
+also reads rendered GPU textures back into buffers to verify black and colored
+additive pixels over both the background and opaque geometry, visible frames in
+both games, repeated CPU/GPU switching, device loss and post-device-creation
+initialization failure. These hardware checks passed on the NVIDIA adapter.
+Earlier GPU timing samples did not prove VAGRANT STARS submitted geometry;
+the hardware play report has been regenerated after this fix.

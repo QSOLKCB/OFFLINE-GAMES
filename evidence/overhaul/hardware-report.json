@@ -12,9 +12,9 @@
         "fallback": false
       },
       "backend": "webgpu+wasm",
-      "medianDrawMs": 0.5,
-      "p95DrawMs": 0.6000000014901161,
-      "triangles": 864
+      "medianDrawMs": 2.800000000745058,
+      "p95DrawMs": 3.300000000745058,
+      "triangles": 1074
     },
     {
       "folder": "VAGRANT_STARS",
@@ -26,9 +26,9 @@
         "fallback": false
       },
       "backend": "webgpu+wasm",
-      "medianDrawMs": 1,
-      "p95DrawMs": 1.300000000745058,
-      "triangles": 4479
+      "medianDrawMs": 3,
+      "p95DrawMs": 3.400000000372529,
+      "triangles": 4287
     }
   ]
 }

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import {bakePlanet} from './surface-detail.js';
 // VANILLAJS packed XYZ/RGB scene adapter. Simulation never depends on this module.
-import {perspective, viewMatrix, multiplyMatrices} from '../VAGRANT_STARS/vendor/vanillajs/modules/math/index.js';
+import {perspective, viewMatrix, multiplyMatrices, rotate} from '../VAGRANT_STARS/vendor/vanillajs/modules/math/index.js';
 import './vendor/galaxy/data/uff-demo.js';
 import './vendor/galaxy/uff-physics.js';
 import './vendor/galaxy/galaxy-core.js';
@@ -18,6 +18,15 @@ export function clipNear(points, near = 0.1) {
     if (inside !== (b[3]>=near)) {const t=(near-a[3])/(b[3]-a[3]); out.push(a.map((v,j)=>v+(b[j]-v)*t));}
   }
   return out;
+}
+// Camera-space unit sphere; rays have direction (dx,dy,-1). Null means no
+// forward surface intersection. Taking the exit root also handles entry inside.
+export function planetRayHit(center,dx,dy){
+  const a=dx*dx+dy*dy+1,b=dx*center[0]+dy*center[1]-center[2];
+  const c=center[0]*center[0]+center[1]*center[1]+center[2]*center[2]-1;
+  const disc=b*b-a*c;if(disc<0)return null;
+  const root=Math.sqrt(disc),near=(b-root)/a,far=(b+root)/a;
+  return near>0?near:far>0?far:null;
 }
 export async function detectGPU(nav = globalThis.navigator) {
   try {
@@ -41,12 +50,17 @@ export class Renderer {
   mesh(data,mode='triangles') {const m={data:new Float32Array(data),mode};m.buffer=m;this.meshes.add(m);return m;}
   update(mesh,data) {mesh.data=data;}
   begin(position,orientation) {
-    const rect=this.canvas.getBoundingClientRect(), scale=Math.min(this.gpu ? 1.5 : 1,(this.gpu ? 1920 : 960)/Math.max(1,rect.width));
+    const rect=this.canvas.getBoundingClientRect(), scale=Math.min(1,960/Math.max(1,rect.width));
     const w=Math.max(1,Math.round(rect.width*scale)),h=Math.max(1,Math.round(rect.height*scale));
     if(this.canvas.width!==w||this.canvas.height!==h){this.canvas.width=w;this.canvas.height=h;}
     this.vp=multiplyMatrices(perspective(Math.PI/2.6,w/h),viewMatrix(position,orientation));
     this.ctx.globalCompositeOperation='source-over';this.ctx.fillStyle='#030711';this.ctx.fillRect(0,0,w,h);
-    try { this.gpu?.begin(w,h,this.vp); } catch { this.useCPU(); }
+    try {
+      if(this.gpu){
+        const gpuScale=Math.min(1.5,1920/Math.max(1,rect.width));
+        this.gpu.begin(Math.max(1,Math.round(rect.width*gpuScale)),Math.max(1,Math.round(rect.height*gpuScale)),this.vp);
+      }
+    } catch { this.useCPU(); }
   }
   draw(mesh) {
     if(this.gpu){try {this.gpu.draw(mesh,this.additive,this.writeDepth,this.fogValue);return;} catch {this.useCPU();}}
@@ -96,7 +110,7 @@ export class Renderer {
   dispose(){this.useCPU();this.meshes.clear();}
 }
 export class Environment {
-  constructor(renderer){this.renderer=renderer;this.bakes=0;this.key=null;this.sky=null;this.planetTextures=new Map();}
+  constructor(renderer){this.renderer=renderer;this.bakes=0;this.key=null;this.sky=null;this.planetTextures=new Map();this.planetPixels=new WeakMap();this.nearPlanet=null;}
   configure(seed,sky,planets){
     const key=JSON.stringify([seed,sky,planets]);if(this.key===key)return;this.key=key;this.bakes++;
     const c=document.createElement('canvas');c.width=960;c.height=540;const ctx=c.getContext('2d');
@@ -114,16 +128,45 @@ export class Environment {
   drawPlanets(vp,planets,cam){
     const r=this.renderer,ctx=r.ctx,w=r.canvas.width,h=r.canvas.height;
     for(const planet of planets){
-      const p=projectVertex(vp,...planet.pos.map((v,i)=>v-cam.pos[i]));if(p[3]<=planet.radius)continue;
+      const relative=planet.pos.map((v,i)=>v-cam.pos[i]);
+      const p=projectVertex(vp,...relative);
+      if(p[3]+planet.radius<=0)continue; // only reject a sphere wholly behind us
+      const key=planet.palette||'terrestrial';let texture=this.planetTextures.get(key);
+      if(!texture){texture=bakePlanet(key);if(this.planetTextures.size>=8)this.planetTextures.clear();this.planetTextures.set(key,texture);this.bakes++;}
+      if(Math.hypot(...relative)<planet.radius*4 || p[3]<=planet.radius){
+        const q=cam.q,center=rotate([-q[0],-q[1],-q[2],q[3]],relative).map(v=>v/planet.radius);
+        this.drawNearbyPlanet(center,texture,w,h);continue;
+      }
       const x=(p[0]/p[3]*.5+.5)*w,y=(.5-p[1]/p[3]*.5)*h,rad=planet.radius/p[3]*h/(2*Math.tan(Math.PI/5.2));
       if(x+rad<0||x-rad>w||y+rad<0||y-rad>h)continue;
       const glow=ctx.createRadialGradient(x,y,rad*.96,x,y,rad*1.09);glow.addColorStop(0,'#67b6de90');glow.addColorStop(1,'#67b6de00');ctx.fillStyle=glow;ctx.beginPath();ctx.arc(x,y,rad*1.09,0,Math.PI*2);ctx.fill();
-      const key=planet.palette||'terrestrial';let texture=this.planetTextures.get(key);
-      if(!texture){texture=bakePlanet(key);if(this.planetTextures.size>=8)this.planetTextures.clear();this.planetTextures.set(key,texture);this.bakes++;}
       ctx.drawImage(texture,x-rad,y-rad,rad*2,rad*2);
     }
   }
-  dispose(){this.sky=null;}
+  drawNearbyPlanet(center,texture,w,h){
+    // A bounded ray/sphere surface pass handles grazing views, camera-plane
+    // crossings and atmospheric entry without projecting a singular centre.
+    const scale=Math.min(1,320/Math.max(w,h));
+    const width=Math.max(1,Math.round(w*scale)),height=Math.max(1,Math.round(h*scale));
+    if(!this.nearPlanet){this.nearPlanet=document.createElement('canvas');}
+    const canvas=this.nearPlanet;
+    if(!this.nearPixels||canvas.width!==width||canvas.height!==height){canvas.width=width;canvas.height=height;this.nearPixels=canvas.getContext('2d').createImageData(width,height);}
+    let source=this.planetPixels.get(texture);
+    if(!source){source=texture.getContext('2d').getImageData(0,0,256,256).data;this.planetPixels.set(texture,source);}
+    const data=this.nearPixels.data;data.fill(0);
+    const tan=Math.tan(Math.PI/5.2),aspect=w/h;
+    for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+      const dx=(2*(x+.5)/width-1)*aspect*tan,dy=(1-2*(y+.5)/height)*tan;
+      const t=planetRayHit(center,dx,dy);if(t===null)continue;
+      const nx=t*dx-center[0],ny=t*dy-center[1];
+      const tx=Math.max(0,Math.min(255,Math.round(127.5+nx*126))),ty=Math.max(0,Math.min(255,Math.round(127.5-ny*126)));
+      const i=(y*width+x)*4,j=(ty*256+tx)*4;
+      data[i]=source[j];data[i+1]=source[j+1];data[i+2]=source[j+2];data[i+3]=255;
+    }
+    canvas.getContext('2d').putImageData(this.nearPixels,0,0);
+    this.renderer.ctx.drawImage(canvas,0,0,w,h);
+  }
+  dispose(){this.sky=null;this.nearPlanet=null;this.nearPixels=null;this.planetTextures.clear();}
 }
 export function mountGraphics(renderer){
   const panel=document.createElement('div');panel.className='graphics-controls';
@@ -134,6 +177,6 @@ export function mountGraphics(renderer){
   cpu.onclick=()=>renderer.useCPU();
   detectGPU().then(adapter=>{
     gpu.textContent=adapter?'Enable WebGPU + WASM':'CPU mode · no compatible GPU';gpu.disabled=!adapter;
-    gpu.onclick=async()=>{gpu.disabled=true;try{await renderer.enableGPU(adapter);}catch{renderer.useCPU();status.textContent='GPU unavailable · continuing on CPU';}finally{gpu.disabled=false;}};
+    gpu.onclick=async()=>{gpu.disabled=true;try{const fresh=await detectGPU();if(!fresh)throw new Error('No compatible GPU');await renderer.enableGPU(fresh);}catch{renderer.useCPU();status.textContent='GPU unavailable · continuing on CPU';}finally{gpu.disabled=false;}};
   });
 }

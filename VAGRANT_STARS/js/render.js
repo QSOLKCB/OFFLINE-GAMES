@@ -322,6 +322,7 @@ export class Scene {
     gl.uniform1f(r.fog, fogNear); this.near.flush();
     gl.depthMask(false); gl.enable(gl.BLEND); gl.uniform1f(r.fog, 0); this.nearGlow.flush(); this.lines.flush();
     gl.disable(gl.BLEND); gl.depthMask(true);
+    r.end?.();
     return haze;
   }
   dispose() { this.environment.dispose(); this.renderer.dispose(); }

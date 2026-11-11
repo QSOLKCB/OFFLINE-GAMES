@@ -64,3 +64,12 @@ test('story battles spawn native squadrons and finish through world events',asyn
   assert.equal(p.campaign.chapter,chapter+1);assert.ok(w.events.some(e=>e.type==='missionDone'));assert.equal(p.wanted,0);
  }
 });
+
+test('near-planet rays retain grazing surfaces, reject misses and handle atmospheric entry',async()=>{
+ const {planetRayHit}=await import('../shared/presentation.js');
+ const x=Math.sqrt(1.3**2-.9**2),hit=planetRayHit([x,0,-.9],0,0);
+ assert.ok(hit>0);assert.ok(Math.abs(x*x+(hit-.9)**2-1)<1e-12);
+ assert.equal(planetRayHit([0,0,2],0,0),null);
+ assert.equal(planetRayHit([3,0,-1],0,0),null);
+ assert.equal(planetRayHit([0,0,0],0,0),1);
+});

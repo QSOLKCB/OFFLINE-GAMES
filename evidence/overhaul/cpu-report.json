@@ -6,17 +6,17 @@
       "folder": "IRONWAKE",
       "gpu": null,
       "backend": "cpu",
-      "medianDrawMs": 1.300000000745058,
-      "p95DrawMs": 1.700000001117587,
-      "triangles": 942
+      "medianDrawMs": 1.5,
+      "p95DrawMs": 1.699999999254942,
+      "triangles": 456
     },
     {
       "folder": "VAGRANT_STARS",
       "gpu": null,
       "backend": "cpu",
-      "medianDrawMs": 3.600000001490116,
-      "p95DrawMs": 4.200000001117587,
-      "triangles": 4662
+      "medianDrawMs": 3.299999998882413,
+      "p95DrawMs": 4.099999999627471,
+      "triangles": 4349
     }
   ]
 }
