@@ -190,7 +190,11 @@ export function drawMap(ctx, w, h, world, ui) {
     label(ctx, z.name, c.x, c.y + z.radius * L.scale + 12, 'rgba(200,190,220,.6)', 10);
   }
   for (const pl of sys.planets) { const c = toMap(L, pl.pos); ctx.beginPath(); ctx.arc(c.x, c.y, Math.max(4, pl.radius * L.scale), 0, 7); ctx.fillStyle = 'rgba(90,130,170,.5)'; ctx.fill(); label(ctx, pl.name, c.x, c.y - pl.radius * L.scale - 5, 'rgba(160,190,220,.7)', 10); }
-  for (const lane of world.sector.lanes) { const a = toMap(L, lane.a), b = toMap(L, lane.b); ctx.strokeStyle = 'rgba(80,220,240,.55)'; ctx.lineWidth = 2; ctx.setLineDash([6, 5]); ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); ctx.setLineDash([]); }
+  for (const lane of world.sector.lanes) {
+    ctx.strokeStyle = 'rgba(80,220,240,.55)'; ctx.lineWidth = 2; ctx.setLineDash([6, 5]); ctx.beginPath();
+    lane.points.forEach((point, i) => { const p = toMap(L, point); if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); });
+    ctx.stroke(); ctx.setLineDash([]);
+  }
   const target = world.targetObject();
   for (const poi of world.sector.pois) {
     if (poi.type === 'ring') continue;

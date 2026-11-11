@@ -115,6 +115,10 @@ or changing screens. A click or keypress may be required to unlock audio.
 
 Slingway arrival now selects the destination station/gate, so the next interaction
 continues docking rather than turning back toward the boarding ring.
+Slingways and autopilot plot detours around planetary atmospheres and stellar heat;
+the rings and system map show the actual slingway route. Autopilot slows for bends
+and stops with a warning if a safe approach cannot be found. Manual flight into
+an atmosphere or too close to a star still causes damage.
 See [gameplay, provenance and test notes](../docs/VAGRANT-FREE-ROAM.md).
 
 ## Local mods and modes
