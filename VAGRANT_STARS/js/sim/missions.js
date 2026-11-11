@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import {mods} from '../mod-api.js';
 // Job boards and the "Quiet Signal" storyline. Pure and deterministic for a given captain state.
 import {seededRandom} from '../../vendor/vanillajs/modules/math/index.js';
 import {FACTIONS, SYSTEMS, BASES, HULLS, enemiesOf, routeBetween, REFUSE_REP} from './data.js';
@@ -75,6 +76,7 @@ function courier(p, base, rng, n) {
 
 /** Jobs offered at a base right now. The list changes each time the captain docks. */
 export function jobsAt(p, baseId) {
+  if (mods.mode?.contracts === false) return [];
   const base = BASES[baseId], rng = seededRandom(hash(`${p.seed}:${p.board}:${baseId}`)), jobs = [];
   const step = STORY[p.story];
   if (step && step.at === baseId) {
@@ -86,7 +88,7 @@ export function jobsAt(p, baseId) {
     const job = (rng() < 0.55 ? bounty : courier)(p, base, rng, n) ?? courier(p, base, rng, n);
     if (job) jobs.push(job);
   }
-  return jobs;
+  return [...jobs, ...mods.jobsAt(p, baseId, levelOf(p))];
 }
 
 export function acceptJob(p, job) {
@@ -109,17 +111,19 @@ export function completeMission(p) {
   p.credits += m.reward; p.stats.earned += m.reward; p.stats.missions++;
   adjustRep(p, m.giver, 0.06);
   if (Number.isInteger(m.story)) p.story = m.story + 1;
-  p.mission = null;
+  mods.completed(p, m); p.mission = null;
   return {title: m.title, text: m.done, reward: m.reward, story: Number.isInteger(m.story)};
 }
 /** Courier deliveries complete on docking at the destination. */
 export function missionOnDock(p, baseId) {
   const m = p.mission;
+  if (m && mods.custom(m.kind)?.onDock?.(p, m, baseId) === 'complete') return completeMission(p);
   return m && m.kind === 'courier' && m.base === baseId ? completeMission(p) : null;
 }
 export function missionObjective(p) {
   const m = p.mission;
   if (!m) return null;
+  if (mods.custom(m.kind)) return mods.custom(m.kind).objective(p, m);
   if (m.kind === 'courier') return `Deliver ${m.cargo} crates to ${BASES[m.base].name}, ${SYSTEMS[m.system].name}`;
   const left = (m.total ?? m.count + (m.boss ? 1 : 0)) - m.kills;
   return `Destroy ${left} ${FACTIONS[m.foe].short} ship${left === 1 ? '' : 's'} at the marked position in ${SYSTEMS[m.system].name}`;

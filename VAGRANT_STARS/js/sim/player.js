@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import {mods} from '../mod-api.js';
 // Captain state, trading, outfitting and save validation. Pure: no DOM, clock or storage.
 import {FACTIONS, HULLS, GUNS, LAUNCHERS, SHIELDS, CONSUMABLES, GOODS, BASES, SYSTEMS, RESALE, START, priceAt, stocks} from './data.js';
 
@@ -172,10 +173,11 @@ export function sanitizeSave(raw) {
     if (!s.rep || !Object.keys(FACTIONS).every(id => num(s.rep[id]) && Math.abs(s.rep[id]) <= 1)) return null;
     if (!s.stats || !s.visited || !num(s.time)) return null;
     for (const key of Object.keys(newPlayer().stats)) if (!num(s.stats[key])) return null;
-    if (s.mission !== null && (typeof s.mission !== 'object' || !['bounty', 'courier'].includes(s.mission.kind) || !SYSTEMS[s.mission.system])) return null;
+    if (s.mission !== null && (typeof s.mission !== 'object' || (!['bounty', 'courier'].includes(s.mission.kind) && !mods.custom(s.mission.kind)) || !SYSTEMS[s.mission.system])) return null;
     if (cargoUsed(s) > hull.cargo) return null;
     if (s.patrols === undefined) s.patrols = 0; // migrate existing v1 saves
     if (!int(s.patrols)) return null;
+    if (!mods.validSave(s) || !mods.validMission(s.mission)) return null;
     return s;
   } catch { return null; }
 }

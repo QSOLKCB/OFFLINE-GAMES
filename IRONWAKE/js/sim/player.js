@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import {mods} from '../mod-api.js';
 // Captain state, trade and fitting-out. Pure: no DOM, clock or storage.
 import {FACTIONS, HULLS, BROADSIDES, TURRETS, UPGRADES, ARMORS, SHIELDS, TORPEDO, GOODS, STATIONS, RESALE, START, MARKET_DAY, priceAt, stocks} from './data.js';
 
@@ -126,8 +127,9 @@ export function sanitizeSave(raw) {
     if (!s.cargo || !Object.entries(s.cargo).every(([id, n]) => GOODS[id] && int(n) && n > 0)) return null;
     if (!s.rep || !Object.keys(FACTIONS).every(id => num(s.rep[id]) && Math.abs(s.rep[id]) <= 1)) return null;
     if (!s.stats || !Object.keys(newPlayer().stats).every(key => num(s.stats[key]))) return null;
-    if (s.mission !== null && (typeof s.mission !== 'object' || !['bounty', 'wanted', 'defend', 'delivery'].includes(s.mission.kind))) return null;
+    if (s.mission !== null && (typeof s.mission !== 'object' || (!['bounty', 'wanted', 'defend', 'delivery'].includes(s.mission.kind) && !mods.custom(s.mission.kind)))) return null;
     if (cargoUsed(s) > HULLS[s.hull].cargo) return null;
+    if (!mods.validSave(s) || !mods.validMission(s.mission)) return null;
     return s;
   } catch { return null; }
 }

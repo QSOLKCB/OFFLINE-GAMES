@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
+import {mods} from '../mod-api.js';
+import {HULLS} from './data.js';
 // Procedural geometry for VAGRANT STARS. Pure data: no DOM, no WebGL.
 // A model is flat-shaded triangles in local space: -Z is the nose, +Y is up.
 // Station layouts are shared with the simulation, which collides against their solid boxes.
 import {seededRandom} from '../../vendor/vanillajs/modules/math/index.js';
 
-class Builder {
+export class Builder {
   constructor() { this.p = []; this.n = []; this.c = []; this.g = []; }
   tri(a, b, c, color, glow = 0, centre = null) {
     const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
@@ -146,6 +148,9 @@ const GLASS = [0.25, 0.6, 0.85], DARK = [0.16, 0.17, 0.2], STEEL = [0.5, 0.53, 0
 const shipCache = new Map();
 /** Ship hull tinted with a faction trim colour. Returns model + engines/muzzles hardpoints. */
 export function shipModel(hullId, trim = [0.8, 0.8, 0.85]) {
+  return mods.model(hullId, {Builder, trim, guns: HULLS[hullId]?.guns, base: (id, color = trim) => builtinShipModel(id, color)}, () => builtinShipModel(hullId, trim));
+}
+function builtinShipModel(hullId, trim) {
   const key = hullId + ':' + trim.map(v => v.toFixed(2)).join(',');
   if (shipCache.has(key)) return shipCache.get(key);
   const b = new Builder(), hull = [0.62, 0.65, 0.7], t2 = mul(trim, 0.75);

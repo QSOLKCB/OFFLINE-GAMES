@@ -91,3 +91,13 @@ The site tests fail if a published game has no link on the collection page.
 ## Licence
 
 Apache-2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+## Make it yours
+
+**This is not a product. This is INDEPENDENCE.**
+
+Both games have a local **Mods & modes** workshop, versioned pack API, isolated saves, custom missions, modes, geometry and procedural sounds. Try the included Independence Kit or copy its source to create your own.
+
+- [MOD_GUIDE.md](MOD_GUIDE.md): install packs, write missions/modes, import meshes and replace sounds.
+- [HOW_TO_MAKE_OFFLINE_GAMES.md](HOW_TO_MAKE_OFFLINE_GAMES.md): build and distribute a game you own.
+- [INDEPENDENCE](https://github.com/QSOLKCB/INDEPENDENCE) · [VANILLAJS](https://github.com/QSOLKCB/VANILLAJS)

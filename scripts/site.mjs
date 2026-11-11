@@ -8,8 +8,8 @@ import {dirname, join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 export const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
-const TOP = ['index.html', 'styles.css', 'manifest.webmanifest', 'sw.js', '.nojekyll', 'LICENSE', 'NOTICE', 'assets'];
-const GAME_FILES = ['index.html', 'style.css', 'README.md', 'NOTICE.md', 'js', 'vendor'];
+const TOP = ['index.html', 'styles.css', 'manifest.webmanifest', 'sw.js', '.nojekyll', 'LICENSE', 'NOTICE', 'MOD_GUIDE.md', 'HOW_TO_MAKE_OFFLINE_GAMES.md', 'assets'];
+const GAME_FILES = ['index.html', 'style.css', 'README.md', 'NOTICE.md', 'js', 'mods', 'vendor'];
 /** Every game published on the site. Add a folder here to ship it; the tests insist the landing page links to it. */
 export const GAMES = {VAGRANT_STARS: GAME_FILES, IRONWAKE: GAME_FILES};
 

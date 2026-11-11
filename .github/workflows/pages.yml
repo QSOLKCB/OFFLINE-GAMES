@@ -46,6 +46,7 @@ jobs:
           node IRONWAKE/tests/browser-smoke.mjs
           node IRONWAKE/tests/controller-browser.mjs
           node tests/presentation-browser.mjs
+          node tests/mods-browser.mjs
       - name: Preserve browser evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

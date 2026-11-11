@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
+import {activateMods, mods, packs} from './modding.js';
+import {mountModMenu} from './mod-menu.js';
 // VAGRANT STARS application shell: input, fixed-step loop, camera, sound and screens.
 import {Actions, attachKeyboard} from '../vendor/vanillajs/modules/input/index.js';
 import {FixedClock} from '../vendor/vanillajs/modules/time/index.js';
@@ -13,7 +15,8 @@ import {World, lookQuat} from './sim/world.js';
 import {newPlayer, sanitizeSave} from './sim/player.js';
 import {BASES} from './sim/data.js';
 
-const SAVE_KEY = 'vagrant-stars.save.v1', SETTINGS_KEY = 'vagrant-stars.settings.v1', STEP = 1 / 60;
+let SAVE_KEY = 'vagrant-stars.save.v1';
+const SETTINGS_KEY = 'vagrant-stars.settings.v1', STEP = 1 / 60;
 const $ = id => document.getElementById(id);
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const view = $('view'), hud = $('hud'), flash = $('flash'), ctx = hud.getContext('2d');
@@ -24,8 +27,8 @@ const store = {
 };
 
 let scene;
-try { scene = new Scene(view); } catch (error) {
-  $('fail-text').textContent = `${error.message} VAGRANT STARS needs WebGL.`;
+try { activateMods(location.search); SAVE_KEY = mods.saveKey(SAVE_KEY); scene = new Scene(view); } catch (error) {
+  $('fail-text').textContent = `Cannot load this profile: ${error.message}`;
   overlays.menu.hidden = true; overlays.fail.hidden = false;
   throw error;
 }
@@ -52,7 +55,7 @@ const TIPS = ['Move the mouse to steer. Hold W to open the throttle; the wheel w
 function setMode(next) {
   mode = next; gamepad.reset(); pad = idlePad();
   for (const [name, node] of Object.entries(overlays)) node.hidden = !((name === 'menu' && next === 'menu') || (name === 'help' && next === 'help') || (name === 'pause' && next === 'paused')
-    || (name === 'dead' && next === 'dead') || (name === 'station' && next === 'docked'));
+    || (name === 'workshop' && next === 'workshop') || (name === 'fail' && next === 'fail') || (name === 'dead' && next === 'dead') || (name === 'station' && next === 'docked'));
   clock.setPaused(next !== 'flight'); keyboard.clear(); firing = false; pendingMissile = false; last = null;
   hud.style.visibility = next === 'flight' || next === 'map' ? 'visible' : 'hidden';
   if (next === 'flight' || next === 'map') hud.focus({preventScroll: true});
@@ -181,7 +184,7 @@ hud.addEventListener('wheel', e => {
 }, {passive: false});
 window.addEventListener('blur', () => { if (mode === 'flight' || mode === 'map') setMode('paused'); });
 document.addEventListener('visibilitychange', () => { if (document.hidden && (mode === 'flight' || mode === 'map')) setMode('paused'); });
-document.addEventListener('keydown', e => { if (e.code === 'Escape' && mode === 'paused') { e.preventDefault(); setMode('flight'); } else if (e.code === 'Escape' && mode === 'help') closeHelp(); });
+document.addEventListener('keydown', e => { if (e.code === 'Escape' && mode === 'paused') { e.preventDefault(); setMode('flight'); } else if (e.code === 'Escape' && mode === 'help') closeHelp(); else if (e.code === 'Escape' && mode === 'workshop') setMode('menu'); });
 
 // Controller samples are taken even while simulation is paused or docked.
 for (const event of ['pointermove', 'pointerdown', 'keydown']) window.addEventListener(event, () => { padControl = false; });
@@ -206,16 +209,30 @@ function pollController(now) {
       if (dialog) dialog.close();
       else if (mode === 'paused') setMode('flight');
       else if (mode === 'help') closeHelp();
+      else if (mode === 'workshop') setMode('menu');
     });
   }
 }
 
 // Menus --------------------------------------------------------------------------------------
+overlays.workshop = mountModMenu(packs, mods, () => setMode('workshop'), () => setMode('menu'));
+function fresh() {
+  const p = mods.newPlayer(newPlayer((Date.now() & 0x7fffffff) || 1));
+  if (!sanitizeSave(p)) throw new Error('Mod mode produced an invalid captain. Check newPlayer and equipment.');
+  return p;
+}
+// Stop failed mod hooks instead of running a broken simulation or writing over the last dock save.
+window.addEventListener('error', event => {
+  if (!mods.pack) return;
+  $('fail-text').textContent = `Mod ${mods.profile}: ${event.message}`;
+  setMode('fail');
+});
+
 const refreshMenu = () => { $('btn-continue').hidden = !loadSave(); };
 const closeHelp = () => setMode(helpFrom);
 $('btn-new').addEventListener('click', () => {
   audio.unlock();
-  const start = () => begin(newPlayer((Date.now() & 0x7fffffff) || 1), true);
+  const start = () => begin(fresh(), true);
   if (loadSave()) confirmNewCaptain(start); else start();
 });
 $('btn-continue').addEventListener('click', () => { audio.unlock(); const state = loadSave(); if (state) begin(state, false); else refreshMenu(); });
@@ -225,7 +242,7 @@ overlays.help.querySelector('[data-close]').addEventListener('click', closeHelp)
 $('btn-resume').addEventListener('click', () => { audio.unlock(); setMode('flight'); });
 const quit = () => { world = null; player = null; refreshMenu(); setMode('menu'); };
 $('btn-quit').addEventListener('click', quit); $('btn-dead-quit').addEventListener('click', quit);
-$('btn-restore').addEventListener('click', () => { const state = loadSave(); if (state) begin(state, false); else begin(newPlayer((Date.now() & 0x7fffffff) || 1), true); });
+$('btn-restore').addEventListener('click', () => { const state = loadSave(); if (state) begin(state, false); else begin(fresh(), true); });
 for (const [id, key] of [['vol-sfx', 'sfx'], ['vol-music', 'music']]) {
   $(id).value = settings[key];
   $(id).addEventListener('input', e => { settings[key] = Number(e.target.value); audio.setVolumes(settings.sfx, settings.music); saveSettings(); });
@@ -246,6 +263,7 @@ function sizeHud() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 function frame(now) {
+  if (mode === 'fail') return;
   requestAnimationFrame(frame);
   const seconds = last === null ? 0 : Math.min(0.25, (now - last) / 1000);
   last = now;
@@ -259,7 +277,7 @@ function frame(now) {
     audio.update(false, 0, 0, world); return;
   }
   if (!world) { // title backdrop: a live corner of Meridian
-    backdrop ??= (() => { const w = new World(newPlayer(11)); scene.setSystem(w.system); return w; })();
+    backdrop ??= (() => { const w = new World(newPlayer(11), {modded: false}); scene.setSystem(w.system); return w; })();
     backdrop.step(Math.min(seconds, 0.05), {}); backdrop.events.length = 0;
     updatePoses(backdrop, 1);
     const a = 2.2 + now / 1000 * 0.04, base = backdrop.sector.byId.get('calder').pos;
@@ -308,4 +326,4 @@ refreshMenu(); setMode('menu');
 requestAnimationFrame(frame);
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('../sw.js').catch(() => {});
 // Read-only handle for automated smoke tests and the curious.
-globalThis.__vagrant = {get world() { return world; }, get player() { return player; }, get mode() { return mode; }, scene, audio};
+globalThis.__vagrant = {get modProfile() { return mods.profile; }, get world() { return world; }, get player() { return player; }, get mode() { return mode; }, scene, audio};
