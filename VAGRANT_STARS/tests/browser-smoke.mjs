@@ -3,12 +3,12 @@
 // project subpath exactly as GitHub Pages serves it. Needs Playwright: `npm run test:browser`.
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {mkdirSync, rmSync} from 'node:fs';
+import {mkdirSync, rmSync, writeFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import {join} from 'node:path';
 import {createStaticServer} from '../../scripts/serve.mjs';
 import {root} from '../../scripts/site.mjs';
-import {waitForState} from '../../tests/browser-wait.mjs';
+import {installGameClock, waitForState} from '../../tests/browser-wait.mjs';
 
 const {chromium} = createRequire(import.meta.url)('playwright');
 const stage = '_site_smoke';
@@ -17,8 +17,10 @@ const server = createStaticServer(join(root, stage));
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const home = `http://127.0.0.1:${server.address().port}/OFFLINE-GAMES/`;
 const browser = await chromium.launch({executablePath: process.env.CHROMIUM_EXECUTABLE_PATH || undefined, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist']});
+const out = join(root, 'evidence/browser'); mkdirSync(out, {recursive: true});
 try {
   const page = await browser.newPage({viewport: {width: 1280, height: 720}});
+  await installGameClock(page);
   // SMOKE_CPU_THROTTLE=6 slows the page sixfold, to rehearse a loaded CI runner locally.
   if (process.env.SMOKE_CPU_THROTTLE) await (await page.context().newCDPSession(page)).send('Emulation.setCPUThrottlingRate', {rate: Number(process.env.SMOKE_CPU_THROTTLE)});
   const problems = [];
@@ -27,11 +29,28 @@ try {
   page.on('response', response => { if (response.status() >= 400) problems.push(`${response.status()} ${response.url()}`); });
   page.on('request', request => { if (!request.url().startsWith(home) && !request.url().startsWith('data:')) problems.push(`left the site: ${request.url()}`); });
   const game = () => page.evaluate(() => {
-    const g = globalThis.__vagrant, w = g.world, s = w?.playerShip;
+    const g = globalThis.__vagrant, w = g.world, s = w?.playerShip, target = w?.targetObject();
     return {mode: g.mode, system: w?.system.id, docked: w?.docked ?? null, speed: s ? Math.hypot(...s.body.velocity) : 0, lane: !!s?.lane, ships: w?.ships.length ?? 0,
+      time: w?.time, seed: g.player?.seed, position: s?.body.position, hp: s?.hp, shield: s?.shield, target: w?.target, auto: w?.auto,
+      targetDistance: s && target ? Math.hypot(...(target.body?.position ?? target.pos).map((v, i) => v - s.body.position[i])) : null,
       credits: g.player?.credits, cargo: g.player?.cargo, drawn: g.scene.far.n + g.scene.near.n};
   });
-  const until = (label, check, seconds = 40) => waitForState(label, game, check, seconds, ms => page.waitForTimeout(ms));
+  const checkpoints = [];
+  const report = result => writeFileSync(join(out, 'vagrant-smoke.json'), JSON.stringify({result, cpuThrottle: Number(process.env.SMOKE_CPU_THROTTLE || 1), checkpoints, problems}, null, 2) + '\n');
+  const until = async (label, check, seconds = 40) => {
+    const before = await game(), started = performance.now();
+    try {
+      const state = await waitForState(label, game, check, seconds, ms => page.clock.runFor(ms));
+      checkpoints.push({label, budgetSeconds: seconds, wallMs: performance.now() - started, simulationSeconds: (state.time ?? 0) - (before.time ?? 0), state});
+      console.log(`smoke checkpoint: ${label} (${state.time?.toFixed(2) ?? '-'} simulation seconds)`);
+      return state;
+    } catch (error) {
+      checkpoints.push({label, before, state: await game(), error: String(error), wallMs: performance.now() - started});
+      report('FAIL');
+      await page.screenshot({path: join(out, 'VAGRANT_STARS-smoke-failure.png')}).catch(() => {});
+      throw error;
+    }
+  };
 
   // Collection page -> game.
   await page.goto(home);
@@ -39,7 +58,7 @@ try {
   assert.ok(await page.locator('#vagrant-stars .shot img').evaluate(img => img.complete && img.naturalWidth > 0), 'the screenshot loads');
   await page.click('a.button[href="VAGRANT_STARS/"]');
   await page.waitForSelector('#btn-new');
-  await page.waitForTimeout(600);
+  await page.clock.runFor(600);
   assert.ok((await game()).drawn > 0, 'the title backdrop is rendering');
   assert.equal(await page.locator('#btn-continue').isHidden(), true);
 
@@ -53,6 +72,12 @@ try {
   for (const tab of ['outfitter', 'shipyard', 'contracts']) { await page.click(`[data-tab="${tab}"]`); assert.ok(await page.locator('.st-body .card').count() > 0, tab); }
   await page.click('[data-act="launch"]');
   await until('flight', s => s.mode === 'flight');
+  // Verify that advancing the browser clock actually advances the production
+  // simulation: a paused/broken game must not be mistaken for a slow renderer.
+  await page.clock.runFor(32);
+  const clockStart = (await game()).time;
+  await page.clock.runFor(200);
+  assert.ok(Math.abs((await game()).time - clockStart - 0.2) < 0.02, 'browser clock drives the game ticks');
   await page.mouse.move(700, 340);
   // Observe each effect while the input is still held: a slow machine must not turn a fixed
   // sleep into a failure (gun energy recharges within half a second of releasing the trigger).
@@ -130,6 +155,7 @@ try {
   assert.equal(await page.evaluate(() => globalThis.transitHits), 0, 'the full gate round trip must not cause damage');
 
   assert.deepEqual(problems, []);
+  report('PASS');
   console.log('browser smoke: PASS');
 } finally {
   await browser.close(); server.close(); rmSync(join(root, stage), {recursive: true, force: true});

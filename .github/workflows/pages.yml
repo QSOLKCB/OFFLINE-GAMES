@@ -58,9 +58,32 @@ jobs:
         run: |
           node scripts/site.mjs build _site "${GITHUB_SHA::12}"
           for page in index.html VAGRANT_STARS/index.html IRONWAKE/index.html sw.js; do test -s "_site/$page" || { echo "missing $page"; exit 1; }; done
+  verify-slow-transit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Install pinned browser test tooling
+        run: |
+          npm install --no-save --package-lock=false playwright@1.62.1
+          npx playwright install --with-deps chromium
+      - name: Play Vagrant Stars with sixfold CPU throttling
+        env:
+          SMOKE_CPU_THROTTLE: '6'
+        run: node VAGRANT_STARS/tests/browser-smoke.mjs
+      - name: Preserve throttled browser evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: slow-transit-${{ github.sha }}
+          path: evidence/browser/
+          if-no-files-found: ignore
   deploy:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    needs: verify
+    needs: [verify, verify-slow-transit]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     concurrency:
