@@ -28,6 +28,8 @@ try {
   page.on('console', message => { if (message.type() === 'error') problems.push(`console: ${message.text()}`); });
   page.on('response', response => { if (response.status() >= 400) problems.push(`${response.status()} ${response.url()}`); });
   page.on('request', request => { if (!request.url().startsWith(home) && !request.url().startsWith('data:')) problems.push(`left the site: ${request.url()}`); });
+  // Module loading uses real time; the paused animation clock cannot make it finish.
+  const initialized = () => waitForState('VAGRANT STARS initialized', () => page.evaluate(() => !!globalThis.__vagrant), Boolean, 30);
   const game = () => page.evaluate(() => {
     const g = globalThis.__vagrant, w = g.world, s = w?.playerShip, target = w?.targetObject();
     return {mode: g.mode, system: w?.system.id, docked: w?.docked ?? null, speed: s ? Math.hypot(...s.body.velocity) : 0, lane: !!s?.lane, ships: w?.ships.length ?? 0,
@@ -58,6 +60,7 @@ try {
   assert.ok(await page.locator('#vagrant-stars .shot img').evaluate(img => img.complete && img.naturalWidth > 0), 'the screenshot loads');
   await page.click('a.button[href="VAGRANT_STARS/"]');
   await page.waitForSelector('#btn-new');
+  await initialized();
   await page.clock.runFor(600);
   assert.ok((await game()).drawn > 0, 'the title backdrop is rendering');
   assert.equal(await page.locator('#btn-continue').isHidden(), true);
@@ -106,7 +109,7 @@ try {
   await page.click('.job.story [data-act="accept"]');
 
   // The docked state is saved: reload and continue.
-  await page.reload(); await page.waitForSelector('#btn-continue:not([hidden])');
+  await page.reload(); await initialized(); await page.waitForSelector('#btn-continue:not([hidden])');
   await page.click('#btn-continue'); await page.waitForSelector('.st-shell');
   assert.match(await page.locator('.st-head h1').innerText(), /Tollard Station/);
   assert.equal((await game()).cargo.medgel, 10);
