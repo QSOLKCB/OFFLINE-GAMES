@@ -16,6 +16,7 @@ export function validatePack(pack) {
   for (const mode of pack.modes ?? []) {
     check(validId(mode.id) && !ids.has(mode.id) && text(mode.title) && text(mode.description, 600), 'invalid/duplicate mode'); ids.add(mode.id);
     for (const hook of ['newPlayer', 'onWorld', 'onStep']) check(mode[hook] === undefined || typeof mode[hook] === 'function', `invalid ${hook} hook`);
+    check(mode.contracts === undefined || typeof mode.contracts === 'boolean', 'contracts must be boolean');
   }
   return pack;
 }
@@ -89,15 +90,15 @@ export class ModRuntime {
       version: MOD_API_VERSION, game: this.game, catalogs: adapter.catalogs,
       extend: (table, id, parent, patch) => {
         const catalog = adapter.catalogs[table];
-        check(catalog && validId(id) && own(catalog, parent) && validModState(patch) && !Array.isArray(patch) && patch !== null, 'invalid catalog extension');
+        check(catalog && validId(id) && own(catalog, parent) && validModState(patch) && patch !== null && typeof patch === 'object' && Object.getPrototypeOf(patch) === Object.prototype, 'invalid catalog extension');
         const record = {...structuredClone(catalog[parent]), ...structuredClone(patch)};
         if (own(catalog, id)) Object.assign(catalog[id], record); else catalog[id] = record;
-        if (['hulls', 'vessels'].includes(table) && id !== parent) this.aliases.set(id, this.aliases.get(parent) ?? parent);
+        if (['hulls', 'vessels'].includes(table) && id !== parent) this.aliases.set(id, parent);
         return record;
       },
       missions: {
         type: (id, handler) => {
-          check(validId(id) && typeof handler?.validate === 'function' && typeof handler.objective === 'function' && typeof handler.step === 'function', 'mission type needs validate, objective and step');
+          check(validId(id) && typeof handler?.validate === 'function' && typeof handler.objective === 'function' && typeof handler.step === 'function' && (handler.onDock === undefined || typeof handler.onDock === 'function'), 'mission type needs validate, objective and step');
           const kind = `mod:${pack.id}:${id}`; check(!this.types.has(kind), 'duplicate mission type'); this.types.set(kind, handler); return kind;
         },
         add: mission => {
@@ -119,7 +120,7 @@ export class ModRuntime {
       check(m.repeatable === undefined || typeof m.repeatable === 'boolean', 'repeatable must be boolean');
       check(m.minLevel === undefined || Number.isInteger(m.minLevel) && m.minLevel >= 1 && m.minLevel <= 100, 'invalid mission rank');
       adapter.validateMission(m, this.types.get(m.kind));
-      if (this.types.has(m.kind)) check(this.types.get(m.kind).validate(m), `invalid custom mission ${m.id}`);
+      if (this.types.has(m.kind)) check(this.types.get(m.kind).validate(m) === true, `invalid custom mission ${m.id}`);
     }
     adapter.validate?.(this);
     return this;
@@ -167,10 +168,14 @@ export class ModRuntime {
     this.mode.onStep?.(world, dt);
   }
   model(id, context, fallback) {
-    const factory = this.models.get(id), alias = this.aliases.get(id);
-    if (!factory && !alias) return fallback();
+    let source = id; const seen = new Set();
+    while (!this.models.has(source) && this.aliases.has(source)) {
+      check(!seen.has(source), 'cyclic ship model inheritance'); seen.add(source); source = this.aliases.get(source);
+    }
+    const factory = this.models.get(source);
+    if (!factory && source === id) return fallback();
     const key = JSON.stringify([id, context.trim, context.cannons, context.turrets, context.guns]);
-    if (!this.cache.has(key)) this.cache.set(key, validateModel(factory ? factory(context) : context.base(alias), {...context, game: this.game}));
+    if (!this.cache.has(key)) this.cache.set(key, validateModel(factory ? factory(context) : context.base(source), {...context, game: this.game}));
     return this.cache.get(key);
   }
 }
