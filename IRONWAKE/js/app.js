@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import {newCampaign} from './sim/campaign.js';
 import {activateMods, mods, packs} from './modding.js';
 import {mountModMenu} from './mod-menu.js';
 // IRONWAKE application shell: input, fixed-step loop, orbit camera, sound and screens.
@@ -15,7 +16,9 @@ import {World, headingOf} from './sim/world.js';
 import {newPlayer, sanitizeSave} from './sim/player.js';
 import {STATIONS} from './sim/data.js';
 
-let SAVE_KEY = 'ironwake.save.v1';
+const storyParams = new URLSearchParams(location.search);
+const storyMode = storyParams.get('campaign') === '1' && !storyParams.has('mod');
+let SAVE_KEY = storyMode ? 'ironwake.campaign.v1' : 'ironwake.save.v1';
 const SETTINGS_KEY = 'ironwake.settings.v1', STEP = 1 / 60;
 const $ = id => document.getElementById(id);
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -206,8 +209,10 @@ function pollController(now) {
 
 // Menus --------------------------------------------------------------------------------------
 overlays.workshop = mountModMenu(packs, mods, () => setMode('workshop'), () => setMode('menu'));
+if (storyMode && !mods.pack) { $('btn-new').textContent = 'New story captain'; $('mod-profile').textContent = 'The Lantern Ledger · separate campaign save'; }
 function fresh() {
   const p = mods.newPlayer(newPlayer((Date.now() & 0x7fffffff) || 1));
+  if (storyMode && !mods.pack) p.campaign = newCampaign();
   if (!sanitizeSave(p)) throw new Error('Mod mode produced an invalid captain. Check newPlayer and equipment.');
   return p;
 }

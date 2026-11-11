@@ -8,6 +8,9 @@
   "scripts": {
     "start": "node scripts/serve.mjs",
     "test": "node --test VAGRANT_STARS/tests/*.test.js IRONWAKE/tests/*.test.js tests/*.test.js",
-    "test:browser": "node VAGRANT_STARS/tests/browser-smoke.mjs && node VAGRANT_STARS/tests/controller-browser.mjs && node IRONWAKE/tests/browser-smoke.mjs && node IRONWAKE/tests/controller-browser.mjs && node tests/presentation-browser.mjs"
+    "test:browser": "node VAGRANT_STARS/tests/browser-smoke.mjs && node VAGRANT_STARS/tests/controller-browser.mjs && node IRONWAKE/tests/browser-smoke.mjs && node IRONWAKE/tests/controller-browser.mjs && node tests/presentation-browser.mjs",
+    "test:overhaul": "node tests/visual-overhaul-browser.mjs",
+    "test:assets": "node tests/asset-review-browser.mjs",
+    "build:wasm": "node scripts/build-render-wasm.mjs"
   }
 }

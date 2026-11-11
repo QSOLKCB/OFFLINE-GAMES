@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import {campaignJob, advanceCampaign} from './campaign.js';
 import {mods} from '../mod-api.js';
 // Contract boards and the Most Wanted list. Pure and deterministic for a given captain state.
 import {seededRandom} from '../../vendor/vanillajs/modules/math/index.js';
@@ -65,7 +66,8 @@ export function jobsAt(p, stationId) {
   }
   const makers = station.faction === 'pennant' ? [delivery, delivery, bounty] : [bounty, defend, delivery, bounty];
   for (let n = 0; n < 3 + (rng() < 0.5 ? 1 : 0); n++) { const job = makers[Math.floor(rng() * makers.length)](p, station, rng, n) ?? bounty(p, station, rng, n); jobs.push(job); }
-  return [...jobs, ...mods.jobsAt(p, stationId, levelOf(p))];
+  const story = campaignJob(p, stationId, levelOf(p));
+  return [...(story ? [story] : []), ...jobs, ...mods.jobsAt(p, stationId, levelOf(p))];
 }
 export function acceptJob(p, job) {
   if (p.mission) return {ok: false, text: 'Finish or abandon your current contract first.'};
@@ -84,7 +86,7 @@ export function completeMission(p) {
   if (!m) return null;
   p.credits += m.reward; p.stats.earned += m.reward; p.stats.missions++; adjustRep(p, m.giver, 0.07);
   if (m.kind === 'wanted') p.wanted = m.wanted + 1;
-  mods.completed(p, m); p.mission = null;
+  advanceCampaign(p, m); mods.completed(p, m); p.mission = null;
   return {title: m.title, text: m.done, reward: m.reward, wanted: m.kind === 'wanted', victory: m.kind === 'wanted' && m.wanted === WANTED.length - 1};
 }
 export function failMission(p, text) { const m = p.mission; if (!m) return null; adjustRep(p, m.giver, -0.04); p.mission = null; return {title: m.title, text}; }

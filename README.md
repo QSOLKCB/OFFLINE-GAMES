@@ -39,6 +39,16 @@
 
 Both games include procedural nebula skies, textured planets and atmospheres, animated port approaches, live dockside views and layered stereo sound. Each lives in its own folder with its own tests and a pinned copy of the [VANILLAJS](https://github.com/QSOLKCB/VANILLAJS) modules it uses.
 
+## Visuals, CPU play and the new story
+
+Both games start with Canvas software rendering: no WebGL, WebGPU or WASM is required to play. Nearby hulls gain inset armor panels and edge lighting; stations gain surface panels and illuminated windows. Planets use cached procedural surfaces, storms and atmospheric rims. GALAXY supplies the deterministic decorative star field; VANILLAJS still drives the games.
+
+When a compatible non-fallback WebGPU adapter and WASM support are available, the title screen offers **Enable WebGPU + WASM**. It stays off until clicked, does not persist across reloads, and returns to CPU rendering on device loss or initialization failure. **Use CPU** switches back. The former renderer remains available with `?renderer=webgl` for comparison. Graphics never change collision geometry, hardpoints, flight, combat, or mission simulation.
+
+IRONWAKE also offers **Story campaign · The Lantern Ledger**, an original eight-chapter journey through freight, convoy rescue, trading, mining, refitting and broadside battles. Story captains have a separate save from the original free captain mode. Read the wardroom log for your next contact and visit their port's Contracts board. Failed or abandoned story contracts can be retried; free sailing and the Most Wanted hunt remain available after the ending.
+
+Local measurements and compatibility limits are recorded in [visual overhaul notes](docs/VISUAL-OVERHAUL.md). New screenshots and raw measurements can be regenerated with `npm run test:overhaul` and `npm run test:assets` after installing Playwright. `TEST_HARDWARE_GPU=1 npm run test:overhaul` uses a visible browser and the system GPU when available.
+
 ## Built to be yours
 
 - **Play locally.** No accounts, trackers or runtime cloud services. Serve a downloaded copy on your own machine, or use the hosted version's offline cache after its initial installation completes.
@@ -144,7 +154,8 @@ Pull requests verify and stage the site without deploying it. You can also host 
 
 | Path | Purpose |
 | --- | --- |
-| `VAGRANT_STARS/`, `IRONWAKE/` | Self-contained game source, tests and vendored engine modules |
+| `VAGRANT_STARS/`, `IRONWAKE/` | Game source, tests and vendored engine modules |
+| `shared/` | CPU/WebGPU adapters, cached surface detail, optional WASM and GALAXY sources |
 | `GAME/mods/registry.js` | Installed local mod packs for that game |
 | `GAME/mods/independence-kit/` | Playable examples of missions, modes, models and sound |
 | `GAME/js/sim/` | World rules, NPC behaviour, missions, captain state and geometry |

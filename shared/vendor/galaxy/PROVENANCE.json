@@ -1,0 +1,10 @@
+{
+  "repository": "https://github.com/QSOLKCB/GALAXY",
+  "commit": "f219bb427b3a9b0c93900169d903f48f410ae67a",
+  "files": {
+    "galaxy-core.js": "217739552ff631710481cfa7270df91108c3b41413ca5be66e7e7223d070649e",
+    "uff-physics.js": "ef4490f65fc3a0822ba6f68a720916de2ec13ccabc3e815c5dfe8e6ad7d4565a",
+    "data/uff-demo.js": "3635e6574ab5f7f175109220f7f1b04cd77f2518f4bbbb6ad9a9c57b16b63f6d"
+  },
+  "usage": "Unmodified GALAXY bounded sampling and starAt used to bake the decorative sky. UFF dependencies retained; legacy visual dynamics selected. Not a gravity simulation."
+}

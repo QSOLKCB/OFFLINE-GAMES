@@ -2,3 +2,5 @@ _site/
 _site_*/
 node_modules/
 *.log
+evidence/browser/
+evidence/overhaul/*.png
