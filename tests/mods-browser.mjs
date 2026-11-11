@@ -59,9 +59,9 @@ try {
       w.playerShip.body.position = h === '__vagrant' ? [...m.waypoint] : [m.pos[0], 0, m.pos[1]];
       w.playerShip.body.velocity = [0,0,0]; w.playerShip.throttle = 0;
       for (let i = 0; i < 500; i++) w.step(1/60, {});
-      return {mission: g.player.mission, reward: g.player.credits - before, gl: g.scene.gl.getError(), soundFrames: g.audio.buffers.get('dock').length};
+      return {mission: g.player.mission, reward: g.player.credits - before, backend: g.scene.renderer.backend, visibleScene: g.scene.renderer.ctx.getImageData(0,0,g.scene.canvas.width,g.scene.canvas.height).data.some((v,i,a) => i % 4 !== 3 && v !== a[i % 4]), soundFrames: g.audio.buffers.get('dock').length};
     }, h);
-    assert.equal(played.mission, null); assert.equal(played.reward, 1500); assert.equal(played.gl, 0); assert.ok(played.soundFrames >= 18000 && played.soundFrames <= 20000);
+    assert.equal(played.mission, null); assert.equal(played.reward, 1500); assert.equal(played.backend, 'cpu'); assert.equal(played.visibleScene, true); assert.ok(played.soundFrames >= 18000 && played.soundFrames <= 20000);
     await frames(); await page.screenshot({path: join(out, `${folder}-liberty.png`)}); await dock();
     const explorerKey = `${key}.mod.independence-kit@1.0.0/explorer`;
     assert.equal(await page.evaluate(key => localStorage.getItem(key), key), original);

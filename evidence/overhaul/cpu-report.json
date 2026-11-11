@@ -1,0 +1,22 @@
+{
+  "browser": "158.0.8127.18",
+  "hardwareRequested": false,
+  "games": [
+    {
+      "folder": "IRONWAKE",
+      "gpu": null,
+      "backend": "cpu",
+      "medianDrawMs": 1.300000000745058,
+      "p95DrawMs": 1.700000001117587,
+      "triangles": 942
+    },
+    {
+      "folder": "VAGRANT_STARS",
+      "gpu": null,
+      "backend": "cpu",
+      "medianDrawMs": 3.600000001490116,
+      "p95DrawMs": 4.200000001117587,
+      "triangles": 4662
+    }
+  ]
+}

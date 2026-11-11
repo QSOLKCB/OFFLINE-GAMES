@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
+import {detailedModel} from '../../shared/surface-detail.js';
 // Scene presentation for VAGRANT STARS on the VANILLAJS render-webgl module.
 // The module draws world-space coloured vertices with one camera, so every object is
 // transformed and flat-lit on the CPU each frame and streamed into a few dynamic meshes.
 // Distant objects are drawn first in a uniformly shrunken "far" pass (same image, far better
 // depth precision), then the depth buffer is cleared and nearby objects are drawn at 1:1.
-import {Environment, unitCircle} from './environment.js';
+import {Environment as WebGLEnvironment, unitCircle} from './environment.js';
+import {Renderer as SoftwareRenderer, Environment as SoftwareEnvironment, mountGraphics} from '../../shared/presentation.js';
 import {Renderer} from '../vendor/vanillajs/modules/render-webgl/index.js';
 import {rotate, perspective, viewMatrix, multiplyMatrices, seededRandom} from '../vendor/vanillajs/modules/math/index.js';
 import {FACTIONS} from './sim/data.js';
@@ -26,8 +28,10 @@ class Stream {
 
 export class Scene {
   constructor(canvas) {
-    const r = this.renderer = new Renderer(canvas);
-    this.gl = r.gl; this.canvas = canvas; this.environment = new Environment(r.gl);
+    const legacy = new URLSearchParams(location.search).get("renderer") === "webgl";
+    const r = this.renderer = legacy ? new Renderer(canvas) : new SoftwareRenderer(canvas);
+    this.gl = r.gl; this.canvas = canvas; this.environment = legacy ? new WebGLEnvironment(r.gl) : new SoftwareEnvironment(r);
+    if (!legacy) mountGraphics(r);
     this.far = new Stream(r, 150000); this.near = new Stream(r, 60000);
     this.farGlow = new Stream(r, 30000); this.nearGlow = new Stream(r, 45000); this.lines = new Stream(r, 9000, 'lines');
     this.sky = null; this.fx = []; this.sparks = []; this.trails = new Map();
@@ -96,13 +100,21 @@ export class Scene {
     const [x, y, z, w] = q, m00 = 1 - 2 * (y * y + z * z), m01 = 2 * (x * y - z * w), m02 = 2 * (x * z + y * w), m10 = 2 * (x * y + z * w), m11 = 1 - 2 * (x * x + z * z),
       m12 = 2 * (y * z - x * w), m20 = 2 * (x * z - y * w), m21 = 2 * (y * z + x * w), m22 = 1 - 2 * (x * x + y * y);
     const L = this.light, lx = m00 * L[0] + m10 * L[1] + m20 * L[2], ly = m01 * L[0] + m11 * L[1] + m21 * L[2], lz = m02 * L[0] + m12 * L[1] + m22 * L[2];
+    if (this.detail !== false && radius / Math.max(1,d) > 0.035) model = detailedModel(model, radius > 100);
+    if (!stream.room(model.count * 3)) return;
     const T = this.tint, out = stream.data, tris = model.tris, normals = model.normals, colors = model.colors, glow = model.glow, s = scale * k, ox = px * k, oy = py * k, oz = pz * k;
+    const vxCamera = -(m00 * px + m10 * py + m20 * pz) / scale;
+    const vyCamera = -(m01 * px + m11 * py + m21 * pz) / scale;
+    const vzCamera = -(m02 * px + m12 * py + m22 * pz) / scale;
     let n = stream.n;
     for (let i = 0, count = model.count; i < count; i++) {
       const i3 = i * 3, i9 = i * 9;
+      // Outward normals are baked by Builder. Opaque back faces cannot be
+      // seen from outside the model; avoid transforming/uploading them.
+      if (d > radius && !glow[i] && normals[i3] * (vxCamera - tris[i9]) + normals[i3 + 1] * (vyCamera - tris[i9 + 1]) + normals[i3 + 2] * (vzCamera - tris[i9 + 2]) <= 0) continue;
       let r = colors[i3], g = colors[i3 + 1], b = colors[i3 + 2];
       if (!glow[i]) {
-        const lit = normals[i3] * lx + normals[i3 + 1] * ly + normals[i3 + 2] * lz, shade = 0.26 + (lit > 0 ? lit * 0.86 : lit * -0.07);
+        const lit = normals[i3] * lx + normals[i3 + 1] * ly + normals[i3 + 2] * lz, shade = 0.26 + (lit > 0 ? lit * 0.86 : lit * -0.07) + Math.pow(1 - Math.abs(normals[i3] * (m00 * px + m10 * py + m20 * pz) / Math.max(1,d) + normals[i3 + 1] * (m01 * px + m11 * py + m21 * pz) / Math.max(1,d) + normals[i3 + 2] * (m02 * px + m12 * py + m22 * pz) / Math.max(1,d)), 3) * 0.13;
         r = r * shade * T[0] + flash; g = g * shade * T[1] + flash; b = b * shade * T[2] + flash * 1.4;
       }
       for (let v = 0; v < 9; v += 3) {

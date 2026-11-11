@@ -9,7 +9,7 @@ export function mountModMenu(packs, mods, open, close) {
   const choose = (label, id, mode = 'campaign') => {
     const b = element('button', label); b.dataset.profile = `${id}/${mode}`;
     b.addEventListener('click', () => {
-      const url = new URL(location.href); url.searchParams.delete('mod'); url.searchParams.delete('mode');
+      const url = new URL(location.href); url.searchParams.delete('mod'); url.searchParams.delete('mode'); url.searchParams.delete('campaign');
       if (id !== 'vanilla') { url.searchParams.set('mod', id); url.searchParams.set('mode', mode); }
       location.assign(url.href);
     });

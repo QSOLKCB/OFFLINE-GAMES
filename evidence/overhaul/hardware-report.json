@@ -1,0 +1,34 @@
+{
+  "browser": "158.0.8127.18",
+  "hardwareRequested": true,
+  "games": [
+    {
+      "folder": "IRONWAKE",
+      "gpu": {
+        "vendor": "nvidia",
+        "architecture": "blackwell",
+        "device": "",
+        "description": "",
+        "fallback": false
+      },
+      "backend": "webgpu+wasm",
+      "medianDrawMs": 0.5,
+      "p95DrawMs": 0.6000000014901161,
+      "triangles": 864
+    },
+    {
+      "folder": "VAGRANT_STARS",
+      "gpu": {
+        "vendor": "nvidia",
+        "architecture": "blackwell",
+        "device": "",
+        "description": "",
+        "fallback": false
+      },
+      "backend": "webgpu+wasm",
+      "medianDrawMs": 1,
+      "p95DrawMs": 1.300000000745058,
+      "triangles": 4479
+    }
+  ]
+}

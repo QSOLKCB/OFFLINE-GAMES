@@ -21,7 +21,7 @@ try {
     page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
     page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
     page.on('request', r => { if (!r.url().startsWith(base)) errors.push(`external request ${r.url()}`); });
-    await page.goto(`${base}${folder}/`); await page.waitForSelector('#btn-new'); await page.waitForFunction(h => globalThis[h]?.scene.vp, handle);
+    await page.goto(`${base}${folder}/?renderer=webgl`); await page.waitForSelector('#btn-new'); await page.waitForFunction(h => globalThis[h]?.scene.vp, handle);
     await page.screenshot({path: join(out, `${folder}-title.png`)});
     await page.click('#btn-new'); await page.waitForSelector('.st-shell');
     await page.screenshot({path: join(out, `${folder}-port.png`)});
@@ -94,3 +94,7 @@ try {
   writeFileSync(join(out, 'report.json'), JSON.stringify(report, null, 2) + '\n');
   console.log('presentation browser: PASS', JSON.stringify(report));
 } finally { await browser.close(); server.close(); rmSync(join(root, stage), {recursive: true, force: true}); }
+
+// Keep the established CI entry point covering the default CPU path as well as
+// the explicit legacy WebGL presentation checks above.
+await import('./visual-overhaul-browser.mjs');

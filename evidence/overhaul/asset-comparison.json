@@ -1,0 +1,188 @@
+[
+  {
+    "folder": "IRONWAKE",
+    "subject": "ship",
+    "triangles": 755,
+    "trials": [
+      {
+        "baseMeshMs": 3.425000000046566,
+        "detailedMs": 3.754166666728755
+      },
+      {
+        "detailedMs": 3.3125,
+        "baseMeshMs": 3.237500000046566
+      },
+      {
+        "baseMeshMs": 3.2458333333488554,
+        "detailedMs": 3.308333333271245
+      },
+      {
+        "detailedMs": 3.337499999984478,
+        "baseMeshMs": 3.3666666666201004
+      },
+      {
+        "baseMeshMs": 3.2208333332867674,
+        "detailedMs": 5.512499999953434
+      },
+      {
+        "detailedMs": 3.2833333333643773,
+        "baseMeshMs": 3.1958333333798996
+      }
+    ]
+  },
+  {
+    "folder": "IRONWAKE",
+    "subject": "station",
+    "triangles": 784,
+    "trials": [
+      {
+        "baseMeshMs": 3.100000000015522,
+        "detailedMs": 4.904166666713233
+      },
+      {
+        "detailedMs": 3.0083333333022892,
+        "baseMeshMs": 4.879166666651145
+      },
+      {
+        "baseMeshMs": 3,
+        "detailedMs": 4.975000000015522
+      },
+      {
+        "detailedMs": 3.024999999984478,
+        "baseMeshMs": 2.9791666666666665
+      },
+      {
+        "baseMeshMs": 2.983333333317811,
+        "detailedMs": 3.016666666682189
+      },
+      {
+        "detailedMs": 4.954166666682188,
+        "baseMeshMs": 3
+      }
+    ]
+  },
+  {
+    "folder": "IRONWAKE",
+    "subject": "planet",
+    "triangles": 649,
+    "trials": [
+      {
+        "baseMeshMs": 3.0916666666356227,
+        "detailedMs": 2.962500000062088
+      },
+      {
+        "detailedMs": 4.870833333348855,
+        "baseMeshMs": 2.9874999999689558
+      },
+      {
+        "baseMeshMs": 3.0833333333333335,
+        "detailedMs": 3.0416666666666665
+      },
+      {
+        "detailedMs": 2.962499999984478,
+        "baseMeshMs": 2.9416666666511446
+      },
+      {
+        "baseMeshMs": 3.2999999999689558,
+        "detailedMs": 2.9166666666666665
+      },
+      {
+        "detailedMs": 2.920833333317811,
+        "baseMeshMs": 2.8208333333022892
+      }
+    ]
+  },
+  {
+    "folder": "VAGRANT_STARS",
+    "subject": "ship",
+    "triangles": 3010,
+    "trials": [
+      {
+        "baseMeshMs": 7.041666666666667,
+        "detailedMs": 6.720833333364378
+      },
+      {
+        "detailedMs": 6.6416666666045785,
+        "baseMeshMs": 6.620833333348855
+      },
+      {
+        "baseMeshMs": 6.524999999984478,
+        "detailedMs": 6.654166666635622
+      },
+      {
+        "detailedMs": 6.637500000031044,
+        "baseMeshMs": 6.6208333332712455
+      },
+      {
+        "baseMeshMs": 6.595833333364378,
+        "detailedMs": 6.616666666697711
+      },
+      {
+        "detailedMs": 7.166666666666667,
+        "baseMeshMs": 6.575000000031044
+      }
+    ]
+  },
+  {
+    "folder": "VAGRANT_STARS",
+    "subject": "station",
+    "triangles": 4067,
+    "trials": [
+      {
+        "baseMeshMs": 7.691666666651145,
+        "detailedMs": 7.816666666651145
+      },
+      {
+        "detailedMs": 7.904166666635622,
+        "baseMeshMs": 7.683333333348855
+      },
+      {
+        "baseMeshMs": 7.633333333302289,
+        "detailedMs": 7.708333333333333
+      },
+      {
+        "detailedMs": 7.758333333379899,
+        "baseMeshMs": 7.675000000046566
+      },
+      {
+        "baseMeshMs": 7.637499999953434,
+        "detailedMs": 7.733333333317812
+      },
+      {
+        "detailedMs": 7.733333333317812,
+        "baseMeshMs": 7.612499999968956
+      }
+    ]
+  },
+  {
+    "folder": "VAGRANT_STARS",
+    "subject": "planet",
+    "triangles": 5742,
+    "trials": [
+      {
+        "baseMeshMs": 10.07916666668219,
+        "detailedMs": 9.949999999953434
+      },
+      {
+        "detailedMs": 10,
+        "baseMeshMs": 9.962499999984479
+      },
+      {
+        "baseMeshMs": 10.075000000031045,
+        "detailedMs": 10.07916666668219
+      },
+      {
+        "detailedMs": 10.066666666651145,
+        "baseMeshMs": 10.308333333348855
+      },
+      {
+        "baseMeshMs": 10.083333333333334,
+        "detailedMs": 10.1333333333799
+      },
+      {
+        "detailedMs": 10.308333333348855,
+        "baseMeshMs": 10.154166666713232
+      }
+    ]
+  }
+]

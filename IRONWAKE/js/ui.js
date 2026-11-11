@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import {CHAPTERS} from './sim/campaign.js';
 // Port screens: wardroom, market, dockyard and contract board (plain DOM).
 import {FACTIONS, SECTOR, STATIONS, HULLS, BROADSIDES, TURRETS, UPGRADES, TORPEDO, GOODS, marketEvent, stocks} from './sim/data.js';
 import {cargoUsed, cargoFree, levelOf, netWorth, nextLevelAt, standing, dayOf, maxHull, shieldCap, priceFor, buyGood, sellGood, maxBuy, buyBattery, batteryQuote, buyTurrets, turretQuote,
@@ -60,6 +61,7 @@ export class StationUI {
     const board = SECTOR.stations.map(o => { const e = marketEvent(p.seed, o.id, day); return `<tr><td>${esc(o.name)}</td><td class="${e ? (e.mult > 1 ? 'gold' : 'pos') : 'dim'}">${e ? esc(e.text) : 'Steady trade'}</td></tr>`; }).join('');
     const wanted = WANTED.map((m, i) => `<li class="${i < p.wanted ? 'done' : i === p.wanted ? 'now' : ''}">${i < p.wanted ? '✔' : i === p.wanted ? '➤' : '•'} ${esc(m.name)} <span class="dim">— ${esc(m.field)}, ${cr(m.reward)}</span></li>`).join('');
     return `${this.notice ? `<section class="card notice"><h2>${esc(this.notice.title)}</h2><p>${esc(this.notice.text)}</p></section>` : ''}
+      ${p.campaign ? `<section class="card notice"><h2>The Lantern Ledger · ${p.campaign.chapter === CHAPTERS.length ? 'Campaign complete' : `Chapter ${p.campaign.chapter+1} / ${CHAPTERS.length}`}</h2><p>${p.campaign.chapter < CHAPTERS.length ? `${esc(CHAPTERS[p.campaign.chapter].title)} — meet ${esc(CHAPTERS[p.campaign.chapter].contact)} at ${esc(STATIONS[CHAPTERS[p.campaign.chapter].station].name)}. Open Contracts there for the briefing.` : 'The relief fleet sails again. Continue trading, mining, taking contracts and hunting the Most Wanted.'}</p>${p.campaign.chapter ? `<p class="small">Last log: ${esc(CHAPTERS[p.campaign.chapter-1].done)}</p>` : ''}</section>` : ''}
       <div class="cols">
         <section class="card"><h2>The wardroom</h2><p>${esc(s.about)}</p><p class="rumor">Overheard: “${esc(s.rumors[(p.board + p.stats.missions) % s.rumors.length])}”</p>
           <h3>Captain's log</h3><p>Rank ${levelOf(p)} · net worth ${cr(netWorth(p))}${next ? ` · next rank at ${cr(next)}` : ''}</p>
@@ -113,7 +115,7 @@ export class StationUI {
   #contracts() {
     const p = this.player; this.jobs = jobsAt(p, this.station.id);
     const active = p.mission ? `<section class="card notice"><h2>Active contract</h2><p><strong>${esc(p.mission.title)}</strong></p><p>${esc(missionObjective(p))} · pays ${cr(p.mission.reward)}</p><button data-act="abandon">Abandon contract</button></section>` : '';
-    const list = this.jobs.map(j => `<section class="card job ${j.kind === 'wanted' ? 'story' : ''}"><h2>${j.kind === 'wanted' ? '★ ' : ''}${esc(j.title)}</h2><p>${esc(j.text)}</p>
+    const list = this.jobs.map(j => `<section class="card job ${(j.kind === 'wanted' || j.campaignChapter !== undefined) ? 'story' : ''}"><h2>${(j.kind === 'wanted' || j.campaignChapter !== undefined) ? '★ ' : ''}${esc(j.title)}</h2><p>${esc(j.text)}</p>
       <p><span class="dot" style="background:${rgb(FACTIONS[j.giver].color)}"></span>${esc(FACTIONS[j.giver].name)} · pays <strong>${cr(j.reward)}</strong></p>
       <button class="primary" data-act="accept" data-job="${j.id}" ${p.mission || j.locked ? 'disabled' : ''}>${j.locked ?? (p.mission ? 'Finish your current contract first' : 'Accept')}</button></section>`).join('');
     return `${active}<div class="cols">${list}</div>`;

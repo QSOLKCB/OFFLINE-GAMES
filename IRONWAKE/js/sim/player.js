@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import {validCampaign} from './campaign.js';
 import {mods} from '../mod-api.js';
 // Captain state, trade and fitting-out. Pure: no DOM, clock or storage.
 import {FACTIONS, HULLS, BROADSIDES, TURRETS, UPGRADES, ARMORS, SHIELDS, TORPEDO, GOODS, STATIONS, RESALE, START, MARKET_DAY, priceAt, stocks} from './data.js';
@@ -44,6 +45,7 @@ export function buyGood(p, stationId, goodId, qty) {
 export function sellGood(p, stationId, goodId, qty) {
   const price = priceFor(p, stationId, goodId), held = p.cargo[goodId] ?? 0;
   if (!Number.isInteger(qty) || qty < 1 || qty > held) return no('You do not hold that much.');
+  if (p.campaign) p.campaign.tradeUnits += qty;
   p.credits += price * qty; p.stats.earned += price * qty; p.cargo[goodId] = held - qty;
   if (!p.cargo[goodId]) delete p.cargo[goodId];
   return ok(`Sold ${qty} ${GOODS[goodId].name} for ${price * qty} cr.`);
@@ -119,6 +121,7 @@ export function sanitizeSave(raw) {
   try {
     const s = typeof raw === 'string' ? JSON.parse(raw) : structuredClone(raw), int = v => Number.isSafeInteger(v) && v >= 0, num = v => typeof v === 'number' && Number.isFinite(v);
     if (!s || s.v !== SAVE_VERSION || !HULLS[s.hull] || !BROADSIDES[s.battery] || !TURRETS[s.turret] || !STATIONS[s.station]) return null;
+    if (!validCampaign(s.campaign)) return null;
     if (s.patrols === undefined) s.patrols = 0;
     if (!int(s.patrols)) return null;
     for (const [kind, tiers] of Object.entries(UPGRADES)) if (!Number.isInteger(s[kind]) || s[kind] < 1 || !tiers[s[kind]]) return null;

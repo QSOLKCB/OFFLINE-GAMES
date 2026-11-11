@@ -22,8 +22,9 @@ test('published pages only reference files that are published', async () => {
   const check = (page, dir) => {
     for (const [, ref] of read(page).matchAll(/(?:href|src)="([^"#]+)"/g)) {
       if (/^https?:/.test(ref)) continue;
-      let path = join(dir, ref).replaceAll('\\', '/');
-      if (path === '.' || ref.endsWith('/')) path = join(path, 'index.html').replaceAll('\\', '/');
+      const pathname = ref.split(/[?#]/, 1)[0] || './';
+      let path = join(dir, pathname).replaceAll('\\', '/');
+      if (path === '.' || pathname.endsWith('/')) path = join(path, 'index.html').replaceAll('\\', '/');
       assert.ok(files.has(path), `${page} -> ${ref}`);
     }
   };
