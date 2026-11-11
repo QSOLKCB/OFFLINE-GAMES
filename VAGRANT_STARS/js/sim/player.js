@@ -12,7 +12,7 @@ export function newPlayer(seed = 1) {
     v: SAVE_VERSION, seed: seed >>> 0, credits: 2500, hull: 'sparrow', hp: HULLS.sparrow.hp,
     guns: ['pulse1', 'pulse1'], launcher: null, ammo: 0, shield: 's1', kits: 3, cells: 3, cargo: {},
     rep: Object.fromEntries(Object.entries(FACTIONS).map(([id, f]) => [id, f.start])),
-    system: START.system, base: START.base, mission: null, story: 0, board: 0,
+    system: START.system, base: START.base, patrols: 0, mission: null, story: 0, board: 0,
     stats: {kills: 0, jumps: 0, trades: 0, missions: 0, earned: 0, losses: 0}, visited: {[START.system]: true}, time: 0,
   };
 }
@@ -174,6 +174,8 @@ export function sanitizeSave(raw) {
     for (const key of Object.keys(newPlayer().stats)) if (!num(s.stats[key])) return null;
     if (s.mission !== null && (typeof s.mission !== 'object' || !['bounty', 'courier'].includes(s.mission.kind) || !SYSTEMS[s.mission.system])) return null;
     if (cargoUsed(s) > hull.cargo) return null;
+    if (s.patrols === undefined) s.patrols = 0; // migrate existing v1 saves
+    if (!int(s.patrols)) return null;
     return s;
   } catch { return null; }
 }

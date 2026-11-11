@@ -12,7 +12,7 @@ const stage = '_site_presentation', out = join(root, 'evidence/browser'); mkdirS
 execFileSync(process.execPath, [join(root, 'scripts/site.mjs'), 'build', `${stage}/OFFLINE-GAMES`, 'presentation']);
 const server = createStaticServer(join(root, stage)); await new Promise(r => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}/OFFLINE-GAMES/`;
-const browser = await chromium.launch({args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist']});
+const browser = await chromium.launch({executablePath: process.env.CHROMIUM_EXECUTABLE_PATH || undefined, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist']});
 const report = {browser: browser.version(), games: []};
 try {
   for (const [folder, handle] of [['IRONWAKE', '__ironwake'], ['VAGRANT_STARS', '__vagrant']]) {

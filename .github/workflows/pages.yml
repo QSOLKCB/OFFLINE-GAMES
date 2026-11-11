@@ -42,6 +42,7 @@ jobs:
       - name: Play both games and verify presentation
         run: |
           node VAGRANT_STARS/tests/browser-smoke.mjs
+          node VAGRANT_STARS/tests/controller-browser.mjs
           node IRONWAKE/tests/browser-smoke.mjs
           node tests/presentation-browser.mjs
       - name: Preserve browser evidence
