@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import {mods} from '../mod-api.js';
 // Contract boards and the Most Wanted list. Pure and deterministic for a given captain state.
 import {seededRandom} from '../../vendor/vanillajs/modules/math/index.js';
 import {FACTIONS, SECTOR, STATIONS, HULLS, REFUSE_REP, captainName} from './data.js';
@@ -54,6 +55,7 @@ function delivery(p, station, rng, n) {
 
 /** Jobs offered at a station now. The board changes every time the captain docks. */
 export function jobsAt(p, stationId) {
+  if (mods.mode?.contracts === false) return [];
   const station = STATIONS[stationId], rng = seededRandom(hash(`${p.seed}:${p.board}:${stationId}`)), jobs = [], mark = WANTED[p.wanted];
   if (mark && FACTIONS[station.faction].lawful) {
     const field = fieldNamed(mark.field);
@@ -63,7 +65,7 @@ export function jobsAt(p, stationId) {
   }
   const makers = station.faction === 'pennant' ? [delivery, delivery, bounty] : [bounty, defend, delivery, bounty];
   for (let n = 0; n < 3 + (rng() < 0.5 ? 1 : 0); n++) { const job = makers[Math.floor(rng() * makers.length)](p, station, rng, n) ?? bounty(p, station, rng, n); jobs.push(job); }
-  return jobs;
+  return [...jobs, ...mods.jobsAt(p, stationId, levelOf(p))];
 }
 export function acceptJob(p, job) {
   if (p.mission) return {ok: false, text: 'Finish or abandon your current contract first.'};
@@ -82,14 +84,19 @@ export function completeMission(p) {
   if (!m) return null;
   p.credits += m.reward; p.stats.earned += m.reward; p.stats.missions++; adjustRep(p, m.giver, 0.07);
   if (m.kind === 'wanted') p.wanted = m.wanted + 1;
-  p.mission = null;
+  mods.completed(p, m); p.mission = null;
   return {title: m.title, text: m.done, reward: m.reward, wanted: m.kind === 'wanted', victory: m.kind === 'wanted' && m.wanted === WANTED.length - 1};
 }
 export function failMission(p, text) { const m = p.mission; if (!m) return null; adjustRep(p, m.giver, -0.04); p.mission = null; return {title: m.title, text}; }
-export const missionOnDock = (p, stationId) => (p.mission?.kind === 'delivery' && p.mission.dest === stationId ? completeMission(p) : null);
+export function missionOnDock(p, stationId) {
+  const m = p.mission;
+  if (m && mods.custom(m.kind)?.onDock?.(p, m, stationId) === 'complete') return completeMission(p);
+  return m?.kind === 'delivery' && m.dest === stationId ? completeMission(p) : null;
+}
 export function missionObjective(p) {
   const m = p.mission;
   if (!m) return null;
+  if (mods.custom(m.kind)) return mods.custom(m.kind).objective(p, m);
   if (m.kind === 'delivery') return `Deliver ${m.cargo} crates to ${STATIONS[m.dest].name}`;
   if (m.kind === 'defend') return m.spawned ? `Destroy the raiders (${m.total - m.kills} left) and keep a hauler alive` : 'Reach the distress beacon';
   return m.spawned ? `Destroy ${m.boss}'s squadron (${m.total - m.kills} left)` : `Hunt down ${m.boss}`;

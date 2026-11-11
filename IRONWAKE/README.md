@@ -109,3 +109,13 @@ available, `npm run test:browser` also plays the games in a real browser.
 
 IRONWAKE is an original game in its genre. See [`NOTICE.md`](NOTICE.md) for
 what it does and does not contain.
+
+## Local mods and modes
+
+Choose **Mods & modes** on the title screen to play the included Independence Kit. It adds a Liberty hull, new geometry/sound, survey/freight jobs, exploration mode and a three-wave proving ground. Each pack version/mode has its own save.
+
+Create your own using [MOD_GUIDE.md](../MOD_GUIDE.md), or build a new game with [HOW_TO_MAKE_OFFLINE_GAMES.md](../HOW_TO_MAKE_OFFLINE_GAMES.md). Packs are editable local JavaScript in `mods/`; register them in `mods/registry.js`.
+
+**This is not a product. This is INDEPENDENCE.**
+
+[INDEPENDENCE](https://github.com/QSOLKCB/INDEPENDENCE) · [VANILLAJS](https://github.com/QSOLKCB/VANILLAJS)

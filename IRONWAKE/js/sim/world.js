@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import {mods} from '../mod-api.js';
 // The battle plane: sailing, broadsides, turrets, deflectors, warp, traffic and contracts.
 // Pure simulation on VANILLAJS flight / weapons / adaptive-circles / range2d / lead-solver.
 // Ships are held to the X/Z plane (y = 0). Heading h turns left as it grows.
@@ -73,8 +74,8 @@ export function buildSector() {
 
 export class World {
   /** traffic:false keeps ambient ships out (contract targets still appear); used by tests. */
-  constructor(player, {seed = player.seed, traffic = true} = {}) {
-    this.player = player; this.traffic = traffic; this.rng = seededRandom((seed ^ 0x2f6b8d41) >>> 0);
+  constructor(player, {seed = player.seed, traffic = true, modded = true} = {}) {
+    this.modded = modded; this.player = player; this.traffic = traffic; this.rng = seededRandom((seed ^ 0x2f6b8d41) >>> 0);
     this.sector = buildSector(); this.time = 0; this.events = []; this.nextId = 1; this.over = false;
     this.#reset(); this.launch(true);
   }
@@ -99,6 +100,7 @@ export class World {
     this.playerShip.hp = clamp(p.hp, 1, maxHull(p));
     if (this.traffic) for (let i = 0; i < 2; i++) this.#spawnTraffic(2000 + this.rng() * 1500, true);
     if (!initial) this.events.push({type: 'launch'});
+    mods.startWorld(this);
   }
   #makeShip({cls, kind, name, faction, isPlayer = false, pos, heading, hp, shield, shieldRegen = 0.05, cannons = 0, turrets = 0, battery = null, turret = null,
     speed, accel, turn, radius, soak = 0, deflector = null, torps = 0, gun = null, skill = 0.5, ai = null, bounty = 0}) {
@@ -186,6 +188,7 @@ export class World {
   waypoint() {
     const m = this.player.mission;
     if (!m) return this.encounters.waypoint();
+    if (mods.custom(m.kind)) return {pos: m.pos, label: m.title};
     return m.kind === 'delivery' ? {pos: STATIONS[m.dest].pos, label: STATIONS[m.dest].name, station: m.dest} : {pos: m.pos, label: m.kind === 'defend' ? 'Distress beacon' : m.boss};
   }
   /** The selected destination for warp and the HUD: station, contract or shipping signal. */
@@ -278,7 +281,7 @@ export class World {
     this.#stepShells(dt);
     this.#stepTorpedoes(dt);
     this.#stepPickups(dt);
-    this.#stepMission();
+    this.#stepMission(dt);
     this.encounters.step(dt);
     this.#spawner(dt);
     if (this.ships.some(s => !s.alive || s.gone)) {
@@ -286,6 +289,7 @@ export class World {
       this.ships = this.ships.filter(s => s.alive && !s.gone);
     }
     if (this.target && !this.targetObject()) this.target = null;
+    mods.step(this, dt);
   }
 
   #stepWarp(ship, ctl, cmd, dt) {
@@ -574,8 +578,15 @@ export class World {
     if (this.pickups.some(k => k.life <= 0)) this.pickups = this.pickups.filter(k => k.life > 0);
   }
 
-  #stepMission() {
+  #stepMission(dt) {
     const p = this.player, m = p.mission, me = this.playerShip.body.position;
+    const custom = mods.custom(m?.kind);
+    if (custom) {
+      const result = custom.step(this, dt, m);
+      if (result === 'complete') this.events.push({type: 'missionDone', result: completeMission(p)});
+      else if (result === 'fail') { p.mission = null; this.events.push({type: 'msg', tone: 'warn', text: `Contract failed: ${m.title}`}); }
+      return;
+    }
     if (!m || m.kind === 'delivery') return;
     if (!m.spawned && Math.hypot(me[0] - m.pos[0], me[2] - m.pos[1]) < 3600) {
       m.spawned = true; m.kills = 0;

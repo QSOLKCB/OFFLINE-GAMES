@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import {mods} from './mod-api.js';
 // Sound for VAGRANT STARS. Effects are scored as VANILLAJS audio2d events (integer-sample,
 // four lanes, 48 kHz) and baked once into AudioBuffers; the engine hum and the ambient score
 // are live Web Audio voices. Each star system has its own root note, so every sky has a key.
@@ -43,7 +44,7 @@ export const SOUNDS = {
   tractor: [[['triangle', 300, 520, 400, 3000, 8]]],
 };
 /** Rendered PCM for a named effect; pure and deterministic (used by tests). */
-export const renderSound = name => score(SOUNDS[name]).renderAll();
+export const renderSound = name => score(mods.sounds.get(name) ?? SOUNDS[name]).renderAll();
 
 const SCALE = [0, 2, 3, 5, 7, 8, 10]; // natural minor
 const CHORDS = [[0, 2, 4], [5, 0, 2], [3, 5, 0], [4, 6, 1]];
@@ -63,7 +64,7 @@ export class GameAudio {
     this.engineGain = ctx.createGain(); this.engineGain.gain.value = 0;
     this.engineOsc.connect(this.engineFilter); this.engineFilter.connect(this.engineGain); this.engineGain.connect(this.sfx); this.engineOsc.start();
     this.setVolumes(this.sfxVolume, this.musicVolume);
-    for (const name of Object.keys(SOUNDS)) {
+    for (const name of new Set([...Object.keys(SOUNDS), ...mods.sounds.keys()])) {
       const pcm = renderSound(name), buffer = ctx.createBuffer(1, pcm.length, AUDIO2D_RATE), out = buffer.getChannelData(0);
       out.set(masterPCM(pcm, AUDIO2D_RATE));
       this.buffers.set(name, buffer);

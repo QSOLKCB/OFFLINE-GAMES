@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
+import {activateMods, mods, packs} from './modding.js';
+import {mountModMenu} from './mod-menu.js';
 // IRONWAKE application shell: input, fixed-step loop, orbit camera, sound and screens.
 import {Actions, attachKeyboard, attachMouseLook} from '../vendor/vanillajs/modules/input/index.js';
 import {FixedClock} from '../vendor/vanillajs/modules/time/index.js';
@@ -13,7 +15,8 @@ import {World, headingOf} from './sim/world.js';
 import {newPlayer, sanitizeSave} from './sim/player.js';
 import {STATIONS} from './sim/data.js';
 
-const SAVE_KEY = 'ironwake.save.v1', SETTINGS_KEY = 'ironwake.settings.v1', STEP = 1 / 60;
+let SAVE_KEY = 'ironwake.save.v1';
+const SETTINGS_KEY = 'ironwake.settings.v1', STEP = 1 / 60;
 const $ = id => document.getElementById(id);
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const view = $('view'), hud = $('hud'), flash = $('flash'), ctx = hud.getContext('2d');
@@ -24,8 +27,8 @@ const store = {
 };
 
 let scene;
-try { scene = new Scene(view); scene.setSky(); } catch (error) {
-  $('fail-text').textContent = `${error.message} IRONWAKE needs WebGL.`;
+try { activateMods(location.search); SAVE_KEY = mods.saveKey(SAVE_KEY); scene = new Scene(view); scene.setSky(); } catch (error) {
+  $('fail-text').textContent = `Cannot load this profile: ${error.message}`;
   overlays.menu.hidden = true; overlays.fail.hidden = false;
   throw error;
 }
@@ -55,7 +58,7 @@ const TIPS = ['Move the mouse to look around. W and S set the throttle; A and D 
 function setMode(next) {
   mode = next; gamepad.reset(); pad = idlePad(); world?.cancelAim();
   for (const [name, node] of Object.entries(overlays)) node.hidden = !((name === 'menu' && next === 'menu') || (name === 'help' && next === 'help') || (name === 'pause' && next === 'paused')
-    || (name === 'dead' && next === 'dead') || (name === 'station' && next === 'docked'));
+    || (name === 'workshop' && next === 'workshop') || (name === 'fail' && next === 'fail') || (name === 'dead' && next === 'dead') || (name === 'station' && next === 'docked'));
   clock.setPaused(next !== 'flight'); keyboard.clear(); pendingTorpedo = false; triggerHeld = false; last = null;
   if (next !== 'flight') look.release();
   hud.style.visibility = next === 'flight' || next === 'map' ? 'visible' : 'hidden';
@@ -168,7 +171,7 @@ document.addEventListener('contextmenu', e => { if (mode === 'flight' || mode ==
 document.addEventListener('wheel', e => { if (mode === 'flight') view3.zoom = clamp(view3.zoom + Math.sign(e.deltaY) * 0.12, 0.6, 2.4); }, {passive: true});
 window.addEventListener('blur', () => { if (mode === 'flight' || mode === 'map') setMode('paused'); });
 document.addEventListener('visibilitychange', () => { if (document.hidden && (mode === 'flight' || mode === 'map')) setMode('paused'); });
-document.addEventListener('keydown', e => { if (e.code === 'Escape' && mode === 'paused') { e.preventDefault(); setMode('flight'); } else if (e.code === 'Escape' && mode === 'help') closeHelp(); });
+document.addEventListener('keydown', e => { if (e.code === 'Escape' && mode === 'paused') { e.preventDefault(); setMode('flight'); } else if (e.code === 'Escape' && mode === 'help') closeHelp(); else if (e.code === 'Escape' && mode === 'workshop') setMode('menu'); });
 
 // Poll menus as well as flight. A screen change or reconnect requires neutral input.
 for (const event of ['pointermove', 'pointerdown', 'keydown']) window.addEventListener(event, () => { padControl = false; });
@@ -196,14 +199,27 @@ function pollController(now) {
       if (dialog) dialog.close();
       else if (mode === 'paused') setMode('flight');
       else if (mode === 'help') closeHelp();
+      else if (mode === 'workshop') setMode('menu');
     });
   }
 }
 
 // Menus --------------------------------------------------------------------------------------
+overlays.workshop = mountModMenu(packs, mods, () => setMode('workshop'), () => setMode('menu'));
+function fresh() {
+  const p = mods.newPlayer(newPlayer((Date.now() & 0x7fffffff) || 1));
+  if (!sanitizeSave(p)) throw new Error('Mod mode produced an invalid captain. Check newPlayer and equipment.');
+  return p;
+}
+// Stop failed mod hooks instead of running a broken simulation or writing over the last dock save.
+window.addEventListener('error', event => {
+  if (!mods.pack) return;
+  $('fail-text').textContent = `Mod ${mods.profile}: ${event.message}`;
+  setMode('fail');
+});
+
 const refreshMenu = () => { $('btn-continue').hidden = !loadSave(); };
 const closeHelp = () => setMode(helpFrom);
-const fresh = () => newPlayer((Date.now() & 0x7fffffff) || 1);
 $('btn-new').addEventListener('click', () => { audio.unlock(); const start = () => begin(fresh(), true); if (loadSave()) confirmNewCaptain(start); else start(); });
 $('btn-continue').addEventListener('click', () => { audio.unlock(); const state = loadSave(); if (state) begin(state, false); else refreshMenu(); });
 $('btn-help').addEventListener('click', () => { helpFrom = 'menu'; setMode('help'); });
@@ -238,6 +254,7 @@ function sizeHud() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 function frame(now) {
+  if (mode === 'fail') return;
   requestAnimationFrame(frame);
   const seconds = last === null ? 0 : Math.min(0.25, (now - last) / 1000);
   last = now;
@@ -250,7 +267,7 @@ function frame(now) {
     audio.update(false, 0, 0, world); return;
   }
   if (!world) { // title backdrop: Anchorage Prime and whoever is sailing past
-    backdrop ??= new World(newPlayer(11));
+    backdrop ??= new World(newPlayer(11), {modded: false});
     backdrop.step(Math.min(seconds, 0.05), {}); backdrop.events.length = 0;
     updatePoses(backdrop, 1, now / 1000);
     orbit([120, 60, 0], 2.3 + now / 1000 * 0.03, 0.2, 1250);
@@ -296,4 +313,4 @@ refreshMenu(); setMode('menu');
 requestAnimationFrame(frame);
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('../sw.js').catch(() => {});
 // Read-only handle for automated smoke tests and the curious.
-globalThis.__ironwake = {get world() { return world; }, get player() { return player; }, get mode() { return mode; }, scene, audio, view: view3};
+globalThis.__ironwake = {get modProfile() { return mods.profile; }, get world() { return world; }, get player() { return player; }, get mode() { return mode; }, scene, audio, view: view3};

@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
+import {mods} from '../mod-api.js';
 // Procedural geometry for IRONWAKE. Pure data: no DOM, no WebGL.
 // Models are flat-shaded triangles in local space: -Z is the bow, +Y is up, +X is starboard.
 import {seededRandom} from '../../vendor/vanillajs/modules/math/index.js';
 
-class Builder {
+export class Builder {
   constructor() { this.p = []; this.n = []; this.c = []; this.g = []; }
   tri(a, b, c, color, glow = 0, centre = null) {
     const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
@@ -202,6 +203,9 @@ export function haulerModel(trim) {
 }
 /** Model for any vessel class in data.js. */
 export function vesselModel(cls, cannons, turrets, trim) {
+  return mods.model(cls, {Builder, trim, cannons, turrets, base: (id, color = trim) => builtinVesselModel(id, cannons, turrets, color)}, () => builtinVesselModel(cls, cannons, turrets, trim));
+}
+function builtinVesselModel(cls, cannons, turrets, trim) {
   return cls === 'skate' ? craftModel(trim) : cls === 'drover' ? haulerModel(trim) : capitalModel(cls, cannons, turrets, trim);
 }
 /** A dead hulk for wreck fields. */

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import {mods} from '../mod-api.js';
 // The live star system: flight, combat, traffic, gates and slingways. Pure simulation.
 // Built on VANILLAJS flight / collision / projectiles / lead-solver / interactions.
 import {createBody, flightConfig, stepFlight} from '../../vendor/vanillajs/modules/flight/index.js';
@@ -110,8 +111,8 @@ const USE_RULES = [
 
 export class World {
   /** traffic:false keeps ambient ships out (contract targets still appear); used by tests. */
-  constructor(player, {seed = player.seed, traffic = true} = {}) {
-    this.player = player; this.traffic = traffic; this.rng = seededRandom((seed ^ 0x51ed270b) >>> 0); this.goods = GOODS;
+  constructor(player, {seed = player.seed, traffic = true, modded = true} = {}) {
+    this.modded = modded; this.player = player; this.traffic = traffic; this.rng = seededRandom((seed ^ 0x51ed270b) >>> 0); this.goods = GOODS;
     this.time = 0; this.events = []; this.nextId = 1; this.rules = createInteractionResolver(USE_RULES); this.over = false;
     this.enterSystem(player.system, {base: player.base});
   }
@@ -140,6 +141,7 @@ export class World {
     this.playerShip.hp = clamp(p.hp, 1, hull.hp); this.playerShip.body.velocity = forward.map(v => v * speed); this.playerShip.throttle = speed ? 0.8 : 0;
     this.events.push({type: 'system', id: systemId});
     if (this.traffic) for (let i = 0; i < 2; i++) this.#spawnTraffic(1400 + this.rng() * 1600);
+    mods.startWorld(this);
   }
 
   #makeShip({hullId, faction, name, guns, shield, launcher = null, ammo = 0, pos, q, isPlayer = false, skill = 0.5, tier = 1, ai = null}) {
@@ -229,6 +231,7 @@ export class World {
     const m = this.player.mission;
     if (!m) return this.encounters.waypoint();
     if (m.system === this.system.id) {
+      if (mods.custom(m.kind)) return {pos: m.waypoint, label: m.title};
       if (m.kind === 'bounty') return {pos: m.waypoint, label: 'Contract target'};
       const poi = this.sector.byId.get(m.base);
       return {pos: poi.pos, label: poi.name, poi};
@@ -450,7 +453,7 @@ export class World {
     this.#stepShots(dt);
     this.#stepMissiles(dt);
     this.#stepLoot(dt);
-    this.#stepMission();
+    this.#stepMission(dt);
     this.#hazards(dt);
     this.encounters.step(dt);
     this.#spawner(dt);
@@ -459,6 +462,7 @@ export class World {
       this.ships = this.ships.filter(s => s.alive && !s.gone);
     }
     if (this.target && !this.targetObject()) this.target = null;
+    mods.step(this, dt);
   }
 
   #control(ship, c, dt) {
@@ -704,8 +708,15 @@ export class World {
     control.brake = ship.cruise.state === 'off' && speed > ship.hull.speed * 1.25 && d - stop < 900;
   }
 
-  #stepMission() {
+  #stepMission(dt) {
     const p = this.player, m = p.mission, me = this.playerShip;
+    const custom = mods.custom(m?.kind);
+    if (custom) {
+      const result = custom.step(this, dt, m);
+      if (result === 'complete') this.events.push({type: 'missionDone', result: completeMission(p)});
+      else if (result === 'fail') { p.mission = null; this.events.push({type: 'msg', tone: 'warn', text: `Contract failed: ${m.title}`}); }
+      return;
+    }
     if (!m || m.kind !== 'bounty' || m.system !== this.system.id) return;
     m.total ??= m.count + (m.boss ? 1 : 0);
     if (!m.spawned && dist(me.body.position, m.waypoint) < 3200) {

@@ -122,7 +122,7 @@ export function drawHud(ctx, w, h, world, scene, ui) {
   label(ctx, SECTOR.name.toUpperCase(), 18, 26, '#eaf4ff', 14, 'left', '600');
   const field = world.fieldAt(at[0], at[2]);
   label(ctx, `${fmtCr(p.credits)}   Hold ${cargoUsed(p)}/${HULLS[p.hull].cargo}   Rank ${levelOf(p)}${field ? `   ${field.name}` : ''}`, 18, 44, C.neutral, 12, 'left');
-  const objective = missionObjective(p) ?? world.encounters.objective(); let ty = 64;
+  const objective = missionObjective(p) ?? world.mod?.objective ?? world.encounters.objective(); let ty = 64;
   if (objective) { label(ctx, `◆ ${objective}`, 18, ty, C.way, 12, 'left'); ty += 18; }
   if (dest) label(ctx, `➤ Course: ${dest.label}  ${fmtDist(range(dest.pos[0], dest.pos[1]))}   [${ui.controller ? 'RB / R1' : 'J'}] warp`, 18, ty, C.port, 12, 'left');
 

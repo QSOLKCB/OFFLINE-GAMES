@@ -93,3 +93,8 @@ td.acts button { padding:3px 9px; font-size:12.5px; margin-left:4px; }
 .captain-confirm { color: #f9e9ce; background: #1c1713; border: 1px solid #ffd27a; border-radius: 10px; max-width: 440px; padding: 24px; }
 .captain-confirm::backdrop { background: #000b; }
 button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid #ffd27a; outline-offset: 3px; }
+
+/* Local mod workshop: scrollable on small displays and fully focusable. */
+.mod-panel { max-height: 85vh; overflow-y: auto; width: min(680px, 92vw); }
+.mod-panel > button { display: block; width: 100%; margin: 10px 0; text-align: left; }
+.mod-panel h3 { margin-top: 24px; }
