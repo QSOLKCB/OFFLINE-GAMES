@@ -13,6 +13,7 @@ const TAUNTS = {
 
 export function thinkNpc(world, ship, dt) {
   const ai = ship.ai, ctl = {rudder: 0, boost: false, deflect: false, volley: null, craftFire: false};
+  if (ship.encounterWard) { ship.throttle = 0; return ctl; } // disabled relief ship; turrets still defend it
   ai.scanT -= dt;
   if (ai.scanT <= 0) { ai.scanT = 0.5 + (ship.id % 7) * 0.03; acquire(world, ship); }
   let target = ai.target ? world.shipById(ai.target) : null;
@@ -51,6 +52,7 @@ function acquire(world, ship) {
     let d = world.distance(ship, other);
     if (other.id === ai.attacker) d *= 0.5;
     if (ai.prey && other.tag === ai.prey) d *= 0.6;                    // raiders go for the convoy
+    if (ai.preyId === other.id) d *= 0.6;
     if (ship.kind === 'craft' ? other.kind === 'craft' : other.kind !== 'craft') d *= 0.8; // like fights like
     if (d < bestD) { bestD = d; best = other; }
   }

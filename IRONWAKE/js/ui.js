@@ -4,6 +4,7 @@ import {FACTIONS, SECTOR, STATIONS, HULLS, BROADSIDES, TURRETS, UPGRADES, TORPED
 import {cargoUsed, cargoFree, levelOf, netWorth, nextLevelAt, standing, dayOf, maxHull, shieldCap, priceFor, buyGood, sellGood, maxBuy, buyBattery, batteryQuote, buyTurrets, turretQuote,
   buyUpgrade, upgradeQuote, buyTorpedoes, repair, repairCost, buyHull, hullQuote} from './sim/player.js';
 import {jobsAt, acceptJob, abandonMission, missionObjective, WANTED} from './sim/missions.js';
+import {PATROL_TITLES} from './sim/encounters.js';
 
 const esc = text => String(text).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
 const cr = n => `${Math.round(n).toLocaleString('en-US')} cr`;
@@ -63,7 +64,8 @@ export class StationUI {
         <section class="card"><h2>The wardroom</h2><p>${esc(s.about)}</p><p class="rumor">Overheard: “${esc(s.rumors[(p.board + p.stats.missions) % s.rumors.length])}”</p>
           <h3>Captain's log</h3><p>Rank ${levelOf(p)} · net worth ${cr(netWorth(p))}${next ? ` · next rank at ${cr(next)}` : ''}</p>
           <p>${p.stats.capitals} warships and ${p.stats.kills - p.stats.capitals} skates destroyed · ${p.stats.missions} contracts · ${p.stats.mined} rocks cracked</p>
-          <p>${p.mission ? `Active contract: ${esc(missionObjective(p))}` : 'No active contract. See the Contracts tab.'}</p>
+          <p>${p.patrols ?? 0} shipping patrols resolved · Next: ${esc(PATROL_TITLES[(p.patrols ?? 0) % 3])}</p>
+          <p>${p.mission ? `Active contract: ${esc(missionObjective(p))}` : 'No active contract. Take a job from the board, or sail freely and answer the shipping channel.'}</p>
           <h3>Most Wanted</h3><ul class="wanted">${wanted}</ul>${p.wanted >= WANTED.length ? '<p class="pos">Every warrant is served. The Banks are yours.</p>' : ''}</section>
         <section class="card"><h2>Market board</h2><table class="grid">${board}</table><p class="small">The board changes as time passes at sea. A shortage is worth sailing for.</p>
           <h3>Standing</h3><table class="grid">${reps}</table><p class="small">Factions fire on you when Hostile and close their ports when Hunted.</p></section>
