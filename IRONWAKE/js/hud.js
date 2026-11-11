@@ -114,17 +114,17 @@ export function drawHud(ctx, w, h, world, scene, ui) {
   bar(ctx, bx + 258, by + 32, 130, 15, me.deflect.charge, me.deflect.active ? 'rgba(110,255,230,.95)' : 'rgba(60,170,160,.85)', 'DEFLECTOR', me.deflect.active ? 'UP' : '');
   bar(ctx, bx + 12, by + 52, 130, 15, me.throttle, 'rgba(110,170,255,.85)', 'THROTTLE', `${Math.round(speed)} m/s`);
   bar(ctx, bx + 258, by + 52, 130, 15, me.boost, 'rgba(255,170,80,.85)', 'BOOST', '');
-  const mode = me.warp.state === 'on' ? 'WARP' : me.warp.state === 'spool' ? `WARP SPOOLING ${Math.round(me.warp.t / WARP_SPOOL * 100)}%` : me.boosting ? 'BOOSTING' : me.deflect.active ? 'DEFLECTOR UP' : '';
+  const mode = me.warp.state === 'on' ? 'WARP' : me.warp.state === 'spool' ? (me.warp.t >= WARP_SPOOL ? 'ALIGNING FOR WARP' : `WARP SPOOLING ${Math.round(me.warp.t / WARP_SPOOL * 100)}%`) : me.boosting ? 'BOOSTING' : me.deflect.active ? 'DEFLECTOR UP' : '';
   label(ctx, mode || `${me.geometry ? HULLS[p.hull].name : ''}-class ${HULLS[p.hull].cls}`, cx, by + 92, mode ? '#8fd8ff' : C.dim, 11, 'center', '600');
-  label(ctx, `[Q] Torpedoes ${me.torps}`, bx + 12, by + 88, C.neutral, 11, 'left'); label(ctx, `${me.turrets.length} turrets: auto`, bx + 388, by + 88, C.dim, 11, 'right');
+  label(ctx, `[${ui.controller ? 'X / Square' : 'Q'}] Torpedoes ${me.torps}`, bx + 12, by + 88, C.neutral, 11, 'left'); label(ctx, `${me.turrets.length} turrets: auto`, bx + 388, by + 88, C.dim, 11, 'right');
 
   // Captain strip (top left).
   label(ctx, SECTOR.name.toUpperCase(), 18, 26, '#eaf4ff', 14, 'left', '600');
   const field = world.fieldAt(at[0], at[2]);
   label(ctx, `${fmtCr(p.credits)}   Hold ${cargoUsed(p)}/${HULLS[p.hull].cargo}   Rank ${levelOf(p)}${field ? `   ${field.name}` : ''}`, 18, 44, C.neutral, 12, 'left');
-  const objective = missionObjective(p); let ty = 64;
+  const objective = missionObjective(p) ?? world.encounters.objective(); let ty = 64;
   if (objective) { label(ctx, `◆ ${objective}`, 18, ty, C.way, 12, 'left'); ty += 18; }
-  if (dest) label(ctx, `➤ Course: ${dest.label}  ${fmtDist(range(dest.pos[0], dest.pos[1]))}   [J] warp`, 18, ty, C.port, 12, 'left');
+  if (dest) label(ctx, `➤ Course: ${dest.label}  ${fmtDist(range(dest.pos[0], dest.pos[1]))}   [${ui.controller ? 'RB / R1' : 'J'}] warp`, 18, ty, C.port, 12, 'left');
 
   // Radar (top right): view-up, so what you see ahead is at the top.
   const rx = w - 104, ry = 104, rr = 84, scale = rr / 2400, cosv = Math.cos(ui.camYaw), sinv = Math.sin(ui.camYaw);
@@ -156,7 +156,7 @@ export function drawHud(ctx, w, h, world, scene, ui) {
     ctx.globalAlpha = 1; my += 17;
   }
   const port = world.sector.stations.find(s => range(s.pos[0], s.pos[2]) <= s.useRange);
-  if (port && me.warp.state === 'off') label(ctx, world.stationHostile(port) ? `${port.name} will not receive you` : speed > DOCK_SPEED ? `Slow below ${DOCK_SPEED} m/s to dock at ${port.name}` : `Press F to dock at ${port.name}`, cx, by - 14, '#bfe6ff', 12, 'center', '600');
+  if (port && me.warp.state === 'off') label(ctx, world.stationHostile(port) ? `${port.name} will not receive you` : speed > DOCK_SPEED ? `Slow below ${DOCK_SPEED} m/s to dock at ${port.name}` : `Press ${ui.controller ? 'A / Cross' : 'F'} to dock at ${port.name}`, cx, by - 14, '#bfe6ff', 12, 'center', '600');
   if (ui.hint) label(ctx, ui.hint, cx, 28, '#bfe6ff', 12);
 }
 
@@ -168,7 +168,7 @@ export function drawMap(ctx, w, h, world, ui) {
   const L = chart(w, h), p = world.player, me = world.playerShip, dest = world.destination(), way = world.waypoint();
   ctx.fillStyle = 'rgba(3,8,16,.92)'; ctx.fillRect(0, 0, w, h); ctx.textBaseline = 'alphabetic';
   label(ctx, SECTOR.name.toUpperCase(), 40, 40, '#eaf4ff', 18, 'left', '600');
-  label(ctx, 'Click a port to plot a course. [J] warp there · [M] close', 40, 58, C.dim, 11, 'left');
+  label(ctx, ui.controller ? 'D-pad up/down: course · RS: signal · A / RB: warp · B / View: close' : 'Click a port or beacon. [V] signal · [J] warp there · [M] close', 40, 58, C.dim, 11, 'left');
   ctx.strokeStyle = 'rgba(120,190,255,.25)'; ctx.lineWidth = 1; ctx.strokeRect(L.ox - L.size / 2, L.oy - L.size / 2, L.size, L.size);
   ctx.save(); ctx.beginPath(); ctx.rect(L.ox - L.size / 2, L.oy - L.size / 2, L.size, L.size); ctx.clip();
   for (let g = -40000; g <= 40000; g += 10000) { ctx.strokeStyle = 'rgba(120,190,255,.07)'; ctx.beginPath(); const a = toChart(L, g, -46000), b = toChart(L, g, 46000), c = toChart(L, -46000, g), d = toChart(L, 46000, g); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.moveTo(c.x, c.y); ctx.lineTo(d.x, d.y); ctx.stroke(); }
@@ -197,11 +197,15 @@ export function drawMap(ctx, w, h, world, ui) {
   if (!cargo.length) { y += 18; label(ctx, 'Empty', gx, y, C.dim, 11, 'left'); }
   for (const [id, n] of cargo) { y += 18; label(ctx, `${n} × ${GOODS[id].name}`, gx, y, C.neutral, 11, 'left'); }
   if (p.mission?.kind === 'delivery') { y += 18; label(ctx, `${p.mission.cargo} × Bonded crates (contract)`, gx, y, C.way, 11, 'left'); }
+  y += 34; label(ctx, `PATROLS RESOLVED: ${p.patrols ?? 0}`, gx, y, C.gold, 12, 'left', '600');
+  if (world.encounters.active) { y += 20; label(ctx, world.encounters.active.title, gx, y, C.way, 11, 'left'); }
   if (ui.cursor) { ctx.strokeStyle = '#bfe6ff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(ui.cursor.x, ui.cursor.y, 6, 0, 7); ctx.stroke(); }
 }
 /** The port under a chart click, if any. */
 export function mapPick(w, h, world, x, y) {
   const L = chart(w, h); let best = null, bestD = 24;
   for (const s of world.sector.stations) { const c = toChart(L, s.pos[0], s.pos[2]), d = Math.hypot(c.x - x, c.y - y); if (d < bestD) { bestD = d; best = s; } }
+  const way = world.waypoint();
+  if (way && !way.station) { const c = toChart(L, way.pos[0], way.pos[1]); if (Math.hypot(c.x - x, c.y - y) < bestD) best = {id: way.signal ? 'signal' : 'contract'}; }
   return best;
 }

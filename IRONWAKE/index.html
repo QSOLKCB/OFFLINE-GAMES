@@ -14,6 +14,7 @@
 <canvas id="view" aria-label="Battle view"></canvas>
 <canvas id="hud" tabindex="0" aria-label="Bridge display. Mouse looks, keyboard sails."></canvas>
 <div id="flash" aria-hidden="true"></div>
+<p id="pad-status" aria-live="polite">Controller: press a button to connect</p>
 
 <section id="menu" class="overlay">
   <div class="menu-card">
@@ -25,7 +26,7 @@
       <button id="btn-new" class="primary">New captain</button>
       <button id="btn-help">How to fight</button>
     </div>
-    <p class="small">Mouse and keyboard. Runs offline once loaded. Progress is saved in this browser.</p>
+    <p class="small">Mouse, keyboard or standard game controller. Runs offline once loaded. Progress is saved in this browser.</p>
     <p class="small"><a href="../">◂ All offline games</a></p>
   </div>
 </section>
@@ -40,6 +41,7 @@
         <li><kbd>Shift</kbd> boost (hold)</li>
         <li><kbd>N</kbd> plot a course · <kbd>J</kbd> warp drive</li>
         <li><kbd>F</kbd> dock when close and slow</li>
+        <li><kbd>V</kbd> plot the shipping signal · <kbd>X</kbd> brake and drop warp</li>
         <li><kbd>M</kbd> sector chart · <kbd>Esc</kbd> pause</li>
       </ul></div>
       <div><h3>Gunnery</h3><ul>
@@ -58,6 +60,11 @@
         <li>Broadsides crack small rocks into ore; cargo is tractored in automatically</li>
       </ul></div>
     </div>
+    <h3>Shipping channel</h3>
+    <p class="small">Sail without a contract to find Pennant pickets, disabled relief ships and Captain Redwake. Signals appear on the HUD and chart. Win a fight you took part in to earn a bonus and advance the patrol arc. Salvage and recover shields between calls; return to port when your hull is low.</p>
+    <h3>Controller</h3>
+    <p class="small">Left stick: throttle / rudder. Right stick: look and aim. RT/R2: hold to steady, release to fire. LT/L2: deflector. A/Cross: dock. B/Circle: brake. X/Square: torpedo. Y/Triangle: nearest hostile. LB/L1: next ship. RB/R1: warp. Left stick click: bow view. Right stick click: plot signal. D-pad left/right: port/starboard view; up: boost; down: stop throttle. View/Share: chart. Menu/Options: pause.</p>
+    <p class="small">Chart: D-pad up/down selects a course, A/Cross warps there, B/Circle closes. Menus: D-pad up/down selects, A/Cross activates, B/Circle goes back. Left/right changes dock tabs or volume sliders. Release all controls after connecting or changing screens. A click or keypress may be needed once for audio.</p>
     <button class="primary" data-close>Back</button>
   </div>
 </section>

@@ -31,6 +31,9 @@ with the cutter *Tern*: three guns a side, two turrets and 4,000 credits.
   bonded freight, and the Harbor Watch's four **Most Wanted** captains.
 - **Grow.** Four hulls from cutter to dreadnought, four broadside batteries,
   four turret types, and shield, deflector, drive and armour fittings.
+- **Patrol the Banks.** Free roam cycles through a Pennant picket, a disabled
+  League relief ship and Captain Redwake's flagship. Marked signals, radio calls,
+  earned bonuses and recovery windows give each voyage a combat arc.
 
 Lose your ship and you return to your last port as it was when you docked.
 The game saves in this browser each time you dock.
@@ -50,13 +53,19 @@ The game saves in this browser each time you dock.
 | Right mouse | Select the enemy under the cursor (centre crosshair while captured) |
 | R / T | Nearest hostile / next ship |
 | N | Plot a course to the next port or contract marker |
+| V | Plot the active shipping signal |
+| X (hold) | Brake and drop warp |
 | J | Warp drive toward the plotted course |
 | F | Dock when close and below 80 m/s |
 | M | Sector chart (click a port to plot a course) |
 | Wheel | Camera distance |
 | Esc, P | Pause |
 
-Built for a mouse and keyboard on a desktop browser with WebGL.
+Supports mouse/keyboard and standard-mapped Xbox/PlayStation controllers in a
+desktop browser with WebGL. Left stick sails; right stick looks and aims.
+RT/R2 steadies the broadside and fires on release; LT/L2 raises the deflector.
+D-pad left/right snaps to the two broadsides. See the in-game help or the
+[full controls and encounter notes](../docs/IRONWAKE-FREE-ROAM.md).
 
 ## Run it
 
@@ -64,7 +73,7 @@ Browsers do not load ES modules from `file://`, so serve the repository over
 HTTP. From the repository root:
 
 ```bash
-npm start
+node scripts/serve.mjs
 ```
 
 Then open the printed address and choose IRONWAKE.

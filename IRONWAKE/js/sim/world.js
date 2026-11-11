@@ -13,6 +13,7 @@ import {vesselModel, stationBoxes, STATION_RADIUS, scatterField} from './models.
 import {cargoFree, adjustRep, maxHull, shieldCap, levelOf} from './player.js';
 import {completeMission, failMission, missionOnDock} from './missions.js';
 import {thinkNpc} from './ai.js';
+import {EncounterDirector, AMBIENT_LIMIT, MAX_AMBIENT_GROUP} from './encounters.js';
 
 export const AIM_TIME = 1.3, WARP_SPOOL = 2.2, WARP_SPEED = 2400, SENSOR = 5000, DOCK_SPEED = 80, WIDE_CONE = 0.26;
 export const FORE = 0, STARBOARD = 1, AFT = 2, PORT = 3;
@@ -80,6 +81,7 @@ export class World {
   #reset() {
     this.ships = []; this.byId = new Map(); this.shells = []; this.torpedoes = []; this.pickups = [];
     this.target = null; this.dest = null; this.docked = null; this.spawnT = 3; this.groupId = 0; this.ambushT = 6; this.staticDirty = true; this.aim = {side: null, t: 0};
+    this.encounters = new EncounterDirector(this);
     if (this.player.mission) { this.player.mission.spawned = false; this.player.mission.kills = 0; }
   }
 
@@ -170,37 +172,52 @@ export class World {
     for (const s of this.ships) if (!s.isPlayer && s.alive) { const d = this.distance(s, this.playerShip); if (d < SENSOR) out.push({ship: s, dist: d, attitude: this.attitude(s)}); }
     return out.sort((a, b) => a.dist - b.dist);
   }
-  /** Where the active contract points: {pos:[x,z], label}. */
+  /** OPT-REDUCE-001: nearest-only callers need no allocated, sorted contact list. */
+  nearestHostile(range = SENSOR) {
+    let best = null, bestD = Math.min(range, SENSOR);
+    for (const s of this.ships) {
+      if (s.isPlayer || !s.alive || s.gone) continue;
+      const d = this.distance(s, this.playerShip);
+      if (d < bestD && this.hostile(s, this.playerShip)) { best = s; bestD = d; }
+    }
+    return best;
+  }
+  /** Contract waypoint, or the free-roam signal when there is no contract. */
   waypoint() {
     const m = this.player.mission;
-    if (!m) return null;
+    if (!m) return this.encounters.waypoint();
     return m.kind === 'delivery' ? {pos: STATIONS[m.dest].pos, label: STATIONS[m.dest].name, station: m.dest} : {pos: m.pos, label: m.kind === 'defend' ? 'Distress beacon' : m.boss};
   }
-  /** The selected destination for warp and the HUD: a station or the contract marker. */
+  /** The selected destination for warp and the HUD: station, contract or shipping signal. */
   destination() {
-    if (this.dest === 'contract') { const w = this.waypoint(); return w ? {pos: w.pos, label: w.label, radius: 300} : null; }
+    if (this.dest === 'signal') { const w = this.encounters.waypoint(); return w ? {...w, radius: 100} : null; }
+    if (this.dest === 'contract') { const w = this.player.mission && this.waypoint(); return w ? {pos: w.pos, label: w.label, radius: 300} : null; }
     const s = this.dest ? this.sector.byId.get(this.dest) : null;
     return s ? {pos: s.xz, label: s.name, radius: s.radius, station: s} : null;
   }
 
   // Player verbs -----------------------------------------------------------------------------
-  targetNearestHostile() { const c = this.contacts().find(k => k.attitude === 'hostile'); if (c) this.target = c.ship.id; else this.note('No hostiles on the plot.'); return c?.ship ?? null; }
+  targetNearestHostile() { const s = this.nearestHostile(); if (s) this.target = s.id; else this.note('No hostiles on the plot.'); return s; }
   cycleTarget() {
     const list = this.contacts(); if (!list.length) { this.target = null; return null; }
     const at = list.findIndex(c => c.ship.id === this.target), next = list[(at + 1) % list.length].ship;
     this.target = next.id; return next;
   }
-  cycleDest() {
-    const me = this.playerShip.body.position, list = [...(this.waypoint() ? ['contract'] : []), ...[...this.sector.stations].sort((a, b) => dist2(a.xz, [me[0], me[2]]) - dist2(b.xz, [me[0], me[2]])).map(s => s.id)];
-    this.dest = list[(list.indexOf(this.dest) + 1) % list.length];
+  cycleDest(direction = 1) {
+    const me = this.playerShip.body.position, list = [...(this.player.mission ? ['contract'] : this.encounters.active ? ['signal'] : []), ...[...this.sector.stations].sort((a, b) => dist2(a.xz, [me[0], me[2]]) - dist2(b.xz, [me[0], me[2]])).map(s => s.id)];
+    const at = list.indexOf(this.dest);
+    this.dest = list[at < 0 ? (direction < 0 ? list.length - 1 : 0) : (at + (direction < 0 ? -1 : 1) + list.length) % list.length];
     this.note(`Course plotted: ${this.destination().label}.`);
   }
-  selectDest(id) { if (id === 'contract' ? this.waypoint() : this.sector.byId.has(id)) this.dest = id; }
+  selectDest(id) { if (id === 'signal' ? this.encounters.active : id === 'contract' ? this.player.mission : this.sector.byId.has(id)) this.dest = id; }
+  targetSignal() { if (this.encounters.active) { this.dest = 'signal'; this.note(`Course plotted: ${this.destination().label}.`); } else this.note('No active shipping signal.'); }
+  cancelAim() { this.aim.side = null; this.aim.t = 0; }
+  stop() { if (!this.over && !this.docked) { this.#dropWarp(); this.playerShip.throttle = 0; } }
   toggleWarp() {
     const ship = this.playerShip;
     if (this.over || this.docked) return;
     if (ship.warp.state !== 'off') return this.#dropWarp('Warp drive disengaged.');
-    if (this.contacts().some(c => c.attitude === 'hostile' && c.dist < 1700)) return this.note('Hostiles too close to spool the warp drive.', 'warn');
+    if (this.nearestHostile(1700)) return this.note('Hostiles too close to spool the warp drive.', 'warn');
     ship.warp = {state: 'spool', t: 0}; this.events.push({type: 'warp', state: 'spool'});
     this.note(this.destination() ? `Warp drive spooling: ${this.destination().label}.` : 'Warp drive spooling. No course plotted: holding this heading.');
   }
@@ -240,14 +257,15 @@ export class World {
   syncPlayer() { const p = this.player, s = this.playerShip; p.hp = Math.max(1, Math.ceil(s.hp)); p.torps = s.torps; }
 
   // Simulation -------------------------------------------------------------------------------
-  /** cmd: {rudder:-1..1 (+ = port), throttle:-1..1, boost, deflect, hold, aim:[x,z], torpedo} */
+  /** cmd: {rudder:-1..1 (+ = port), throttle:-1..1, boost, brake, deflect, hold, aim:[x,z], torpedo} */
   step(dt, cmd = {}) {
     if (this.over || this.docked) return;
     this.time += dt; this.player.time += dt;
     const me = this.playerShip;
+    if (cmd.brake) this.stop();
     for (const s of this.ships) { s.prevPos = [...s.body.position]; s.prevQ = [...s.body.orientation]; }
-    if (cmd.throttle) me.throttle = clamp(me.throttle + cmd.throttle * dt * 0.7, 0, 1);
-    const ctl = {rudder: clamp(cmd.rudder ?? 0, -1, 1), boost: !!cmd.boost, deflect: !!cmd.deflect, volley: null};
+    if (cmd.throttle && !cmd.brake) me.throttle = clamp(me.throttle + cmd.throttle * dt * 0.7, 0, 1);
+    const ctl = {rudder: clamp(cmd.rudder ?? 0, -1, 1), boost: !!cmd.boost, deflect: !!cmd.deflect, brake: !!cmd.brake, volley: null};
     this.#stepWarp(me, ctl, cmd, dt);
     this.#stepAim(me, ctl, cmd, dt);
     this.#control(me, ctl, dt);
@@ -261,6 +279,7 @@ export class World {
     this.#stepTorpedoes(dt);
     this.#stepPickups(dt);
     this.#stepMission();
+    this.encounters.step(dt);
     this.#spawner(dt);
     if (this.ships.some(s => !s.alive || s.gone)) {
       for (const s of this.ships) if (!s.alive || s.gone) this.byId.delete(s.id);
@@ -273,18 +292,23 @@ export class World {
     const w = ship.warp;
     if (w.state === 'off') return;
     const dest = this.destination(), p = ship.body.position;
+    let aligned = true;
     if (dest) {
       const dx = dest.pos[0] - p[0], dz = dest.pos[1] - p[2], d = Math.hypot(dx, dz);
       if (d < dest.radius + 1300) return this.#dropWarp(`Dropped out of warp off ${dest.label}.`, 'good');
-      if (!cmd.rudder) ctl.rudder = clamp(this.bearingTo(ship, this.avoid(ship, [dx / d, dz / d])) * 3, -1, 1);
+      if (!cmd.rudder) {
+        const bearing = this.bearingTo(ship, this.avoid(ship, [dx / d, dz / d]));
+        ctl.rudder = clamp(bearing * 3, -1, 1); aligned = Math.abs(bearing) < 0.12;
+      }
     }
     if (w.state === 'spool') {
-      w.t += dt; ship.throttle = Math.max(ship.throttle, 0.4);
-      if (w.t >= WARP_SPOOL) { w.state = 'on'; this.events.push({type: 'warp', state: 'on'}); }
+      w.t = Math.min(WARP_SPOOL, w.t + dt); ship.throttle = Math.max(ship.throttle, 0.4);
+      // A nearby signal can be astern. Turning at normal speed avoids a wide warp-speed orbit.
+      if (w.t >= WARP_SPOOL && aligned) { w.state = 'on'; this.events.push({type: 'warp', state: 'on'}); }
       return;
     }
-    if (this.contacts().some(c => c.attitude === 'hostile' && c.dist < 1500)) return this.#dropWarp('Interdicted! Hostiles have pulled you out of warp.', 'warn');
-    if (!this.traffic) return;
+    if (this.nearestHostile(1500)) return this.#dropWarp('Interdicted! Hostiles have pulled you out of warp.', 'warn');
+    if (!this.traffic || !this.canAddAmbient(MAX_AMBIENT_GROUP)) return;
     this.ambushT -= dt;
     if (this.ambushT > 0) return;
     this.ambushT = 5 + this.rng() * 5;
@@ -329,7 +353,7 @@ export class World {
     else if (c.boost && ship.boost > 0.02 && ship.throttle > 0.05) { cfg = ship.cfg.boost; thrust = 1; ship.boost -= dt / 6; ship.boosting = true; }
     if (!ship.boosting) ship.boost = Math.min(1, ship.boost + dt / 11);
     const speed = Math.hypot(body.velocity[0], body.velocity[2]), near = this.sector.grid.query(body.position[0], body.position[2], 90 + ship.radius + speed * dt);
-    const result = stepFlight(body, {thrust: [0, 0, -thrust], turn: [0, c.rudder, 0], brake: false}, dt, cfg, near.length ? near.map(s => s.box) : []);
+    const result = stepFlight(body, {thrust: [0, 0, c.brake ? 0 : -thrust], turn: [0, c.rudder, 0], brake: !!c.brake}, dt, cfg, near.length ? near.map(s => s.box) : []);
     // Hold the hull to the battle plane: yaw only.
     body.position[1] = 0; body.velocity[1] = 0; body.angularVelocity[0] = 0; body.angularVelocity[2] = 0;
     const q = body.orientation, n = Math.hypot(q[1], q[3]) || 1; body.orientation = [0, q[1] / n, 0, q[3] / n];
@@ -474,7 +498,7 @@ export class World {
     this.events.push({type: 'hit', pos: at ? [at[0], 0, at[1]] : [p[0], 0, p[2]], shield: screened || deflected, deflected, onPlayer: victim.isPlayer, quadrant: q});
     if (source) {
       if (victim.ai) victim.ai.attacker = source.id;
-      if (source.isPlayer && !victim.isPlayer) { victim.byPlayer = true; this.#provoke(victim); }
+      if (source.isPlayer && !victim.isPlayer) { victim.byPlayer = true; if (victim.encounter) victim.encounterHit = true; this.#provoke(victim); }
     }
     if (victim.isPlayer) { this.events.push({type: 'playerHit', shield: screened, quadrant: q}); if (victim.warp.state === 'spool') this.#dropWarp('Warp spool broken by enemy fire.', 'warn'); }
     if (victim.hp <= 0) this.#destroy(victim, source);
@@ -576,16 +600,30 @@ export class World {
   }
 
   // Traffic ----------------------------------------------------------------------------------
+  canAddAmbient(count) { return this.ships.filter(s => !s.isPlayer && s.alive && !s.gone && !s.tag && !s.encounter).length + count <= AMBIENT_LIMIT; }
+
+  /** Picket, disabled relief ship, then a named broadside duel. At most four NPCs. */
+  startEncounter(stage, pos) {
+    const rank = Math.min(3, Math.floor((this.player.patrols ?? 0) / 3), Math.floor((levelOf(this.player) - 1) / 2));
+    const capital = stage === 2 ? ['cutter', 'corvette', 'frigate', 'dreadnought'][rank] : ['barracuda', 'cutter', 'corvette', 'frigate'][rank];
+    const wards = stage === 1 ? this.#spawnGroup({faction: 'league', list: [['drover', 1]], pos: [pos[0] + 580, pos[1] + 180], dest: STATIONS.coldharbor.pos}) : [];
+    for (const ward of wards) { ward.encounterWard = true; ward.throttle = 0; ward.name = 'League Relief — Mercy'; }
+    const enemies = this.#spawnGroup({faction: 'pennant', list: [[capital, 1], ['skate', 2]], pos, dest: [this.playerShip.body.position[0], this.playerShip.body.position[2]]});
+    for (const ship of enemies) { ship.provoked = true; ship.ai.sense = 4000; if (wards.length) { ship.ai.preyId = wards[0].id; ship.ai.target = wards[0].id; } }
+    if (stage === 2) { const boss = enemies[0]; boss.name = 'Captain Redwake'; boss.boss = true; boss.hp = boss.maxHp = Math.round(boss.maxHp * 1.25); boss.bounty *= 2; }
+    return {enemies, wards, reward: [900, 1600, 2400][stage] * (rank + 1)};
+  }
   #spawner(dt) {
     const me = this.playerShip;
     for (const s of this.ships) if (!s.isPlayer && !s.tag && this.distance(s, me) > 9000) s.gone = true;
     this.spawnT -= dt;
     if (this.spawnT > 0 || !this.traffic || me.warp.state === 'on') return;
     this.spawnT = 5 + this.rng() * 5;
-    if (new Set(this.ships.filter(s => s.ai && !s.tag).map(s => s.ai.group)).size >= 3) return;
+    if (new Set(this.ships.filter(s => s.ai && s.alive && !s.gone && !s.tag && !s.encounter).map(s => s.ai.group)).size >= 3) return;
     this.#spawnTraffic(3400 + this.rng() * 900);
   }
   #spawnTraffic(range, calm = false) {
+    if (!this.canAddAmbient(MAX_AMBIENT_GROUP)) return;
     const r = this.rng, p = this.playerShip.body.position, field = this.fieldAt(p[0], p[2]), level = levelOf(this.player);
     const a = r() * Math.PI * 2, pos = [p[0] + Math.cos(a) * range, p[2] + Math.sin(a) * range];
     const ports = this.sector.stations, port = () => ports[Math.floor(r() * ports.length)];

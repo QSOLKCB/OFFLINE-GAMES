@@ -10,7 +10,7 @@ const tradeIn = price => Math.round(price * RESALE);
 export function newPlayer(seed = 1) {
   return {v: SAVE_VERSION, seed: seed >>> 0, credits: 4000, hull: 'cutter', hp: HULLS.cutter.hp, battery: 'culverin', turret: 'pulse',
     shield: 1, deflector: 1, engine: 1, armor: 1, torps: 2, cargo: {}, rep: Object.fromEntries(Object.entries(FACTIONS).map(([id, f]) => [id, f.start])),
-    station: START, mission: null, wanted: 0, board: 0, stats: {kills: 0, capitals: 0, missions: 0, earned: 0, losses: 0, mined: 0}, time: 0};
+    station: START, mission: null, wanted: 0, board: 0, patrols: 0, stats: {kills: 0, capitals: 0, missions: 0, earned: 0, losses: 0, mined: 0}, time: 0};
 }
 export const maxHull = p => Math.round(HULLS[p.hull].hp * ARMORS[p.armor].mult);
 export const shieldCap = p => Math.round(HULLS[p.hull].shield * SHIELDS[p.shield].mult);
@@ -118,6 +118,8 @@ export function sanitizeSave(raw) {
   try {
     const s = typeof raw === 'string' ? JSON.parse(raw) : structuredClone(raw), int = v => Number.isSafeInteger(v) && v >= 0, num = v => typeof v === 'number' && Number.isFinite(v);
     if (!s || s.v !== SAVE_VERSION || !HULLS[s.hull] || !BROADSIDES[s.battery] || !TURRETS[s.turret] || !STATIONS[s.station]) return null;
+    if (s.patrols === undefined) s.patrols = 0;
+    if (!int(s.patrols)) return null;
     for (const [kind, tiers] of Object.entries(UPGRADES)) if (!Number.isInteger(s[kind]) || s[kind] < 1 || !tiers[s[kind]]) return null;
     if (!int(s.credits) || !int(s.seed) || !int(s.board) || !int(s.wanted) || !int(s.torps) || s.torps > HULLS[s.hull].torps || !num(s.time) || s.time < 0) return null;
     if (!num(s.hp) || s.hp <= 0 || s.hp > maxHull(s)) return null;
