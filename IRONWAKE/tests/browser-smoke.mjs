@@ -8,6 +8,7 @@ import {createRequire} from 'node:module';
 import {join} from 'node:path';
 import {createStaticServer} from '../../scripts/serve.mjs';
 import {root} from '../../scripts/site.mjs';
+import {waitForState} from '../../tests/browser-wait.mjs';
 
 const {chromium} = createRequire(import.meta.url)('playwright');
 const stage = '_site_smoke_ironwake';
@@ -30,10 +31,7 @@ try {
     return {mode: g.mode, docked: w?.docked ?? null, speed: s ? Math.hypot(s.body.velocity[0], s.body.velocity[2]) : 0, warp: s?.warp.state, shells: w?.shells.length ?? 0, ships: w?.ships.length ?? 0,
       cargo: g.player?.cargo, credits: g.player?.credits, drawn: g.scene.far.n + g.scene.near.n, rel: g.view.rel};
   });
-  const until = async (label, check, seconds = 40) => {
-    for (let i = 0; i < seconds * 5; i++) { const state = await game(); if (await check(state)) return state; await page.waitForTimeout(200); }
-    assert.fail(`timed out waiting for: ${label} (${JSON.stringify(await game())})`);
-  };
+  const until = (label, check, seconds = 40) => waitForState(label, game, check, seconds, ms => page.waitForTimeout(ms));
 
   // Collection page: both games are offered, and the IRONWAKE link opens it.
   await page.goto(home);

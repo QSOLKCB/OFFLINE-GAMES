@@ -8,6 +8,7 @@ import {createRequire} from 'node:module';
 import {join} from 'node:path';
 import {createStaticServer} from '../../scripts/serve.mjs';
 import {root} from '../../scripts/site.mjs';
+import {waitForState} from '../../tests/browser-wait.mjs';
 
 const {chromium} = createRequire(import.meta.url)('playwright');
 const stage = '_site_smoke';
@@ -30,10 +31,7 @@ try {
     return {mode: g.mode, system: w?.system.id, docked: w?.docked ?? null, speed: s ? Math.hypot(...s.body.velocity) : 0, lane: !!s?.lane, ships: w?.ships.length ?? 0,
       credits: g.player?.credits, cargo: g.player?.cargo, drawn: g.scene.far.n + g.scene.near.n};
   });
-  const until = async (label, check, seconds = 40) => {
-    for (let i = 0; i < seconds * 5; i++) { const state = await game(); if (await check(state)) return state; await page.waitForTimeout(200); }
-    assert.fail(`timed out waiting for: ${label} (${JSON.stringify(await game())})`);
-  };
+  const until = (label, check, seconds = 40) => waitForState(label, game, check, seconds, ms => page.waitForTimeout(ms));
 
   // Collection page -> game.
   await page.goto(home);
