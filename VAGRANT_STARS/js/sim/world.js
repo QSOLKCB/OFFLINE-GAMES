@@ -12,7 +12,7 @@ import {shipModel, stationBoxes, STATION_RADIUS, scatterRocks} from './models.js
 import {cargoFree, adjustRep, levelOf} from './player.js';
 import {completeMission, missionOnDock} from './missions.js';
 import {EncounterDirector, AMBIENT_LIMIT, nearestHostile} from './encounters.js';
-import {ATMOSPHERE_SCALE, STELLAR_HEAT_SCALE} from './hazards.js';
+import {ATMOSPHERE_SCALE, STELLAR_HEAT_SCALE, hazardFreeApproach, hazardRoute} from './hazards.js';
 import {thinkNpc, steerToward} from './ai.js';
 
 export const CRUISE_CHARGE = 3.5, BOOST_TIME = 5, BOOST_RECHARGE = 9, LANE_SPEED = 2600, SENSOR = 6000, JUMP_TIME = 1.7;
@@ -58,6 +58,14 @@ function segmentDistance(p, a, b) {
   return dist(p, addScaled(a, ab, t));
 }
 
+/** Distance along a slingway, including its short entry/exit extensions. */
+function lanePose(lane, distance) {
+  let i = 1;
+  while (i < lane.points.length - 1 && distance > lane.distances[i]) i++;
+  const dir = normalize(sub(lane.points[i], lane.points[i - 1]));
+  return {pos: addScaled(lane.points[i - 1], dir, distance - lane.distances[i - 1]), dir};
+}
+
 /** Static content of one star system: points of interest, slingways, rocks and colliders. */
 export function buildSector(system) {
   const pois = [], byId = new Map(), solids = [], grid = new SolidGrid();
@@ -76,23 +84,36 @@ export function buildSector(system) {
   }
   for (const p of pois) byId.set(p.id, p);
   const lanes = system.lanes.map(([from, to], n) => {
-    const a = byId.get(from), b = byId.get(to), d = normalize(sub(b.pos, a.pos));
-    const start = addScaled(a.pos, d, a.radius + 520), end = addScaled(b.pos, d, -(b.radius + 520)), length = dist(start, end);
-    const count = Math.max(2, Math.round(length / 2200) + 1), lane = {id: 'lane' + n, a: start, b: end, dir: d, length, from: a, to: b, q: lookQuat(d), rings: []};
-    for (let i = 0; i < count; i++) {
-      const s = length * i / (count - 1), end0 = i === 0, end1 = i === count - 1;
-      const ring = {id: `${lane.id}:${i}`, type: 'ring', pos: addScaled(start, d, s), radius: 50, useRange: 340, lane, s, minor: !end0 && !end1,
+    const a = byId.get(from), b = byId.get(to), points = hazardRoute(system, a.pos, b.pos);
+    if (!points) return null; // Never offer a rail through a hazard, even in edited systems.
+    if (dist(points[0], points[1]) <= a.radius + 520 || dist(points.at(-2), points.at(-1)) <= b.radius + 520 ||
+      points.length === 2 && dist(a.pos, b.pos) <= a.radius + b.radius + 1040) return null;
+    const d = normalize(sub(points[1], a.pos)), arrival = normalize(sub(b.pos, points.at(-2)));
+    points[0] = addScaled(a.pos, d, a.radius + 520);
+    points[points.length - 1] = addScaled(b.pos, arrival, -(b.radius + 520));
+    const distances = [0];
+    for (let i = 1; i < points.length; i++) distances.push(distances[i - 1] + dist(points[i - 1], points[i]));
+    const length = distances.at(-1), lane = {id: 'lane' + n, a: points[0], b: points.at(-1), dir: d, length, points, distances, from: a, to: b, q: lookQuat(d), rings: []};
+    // Include every bend as a ring so the visible rail matches the physical route.
+    const stops = [0];
+    for (let i = 1; i < points.length; i++) {
+      const span = distances[i] - distances[i - 1], count = Math.max(1, Math.ceil(span / 2200));
+      for (let j = 1; j <= count; j++) stops.push(distances[i - 1] + span * j / count);
+    }
+    for (let i = 0; i < stops.length; i++) {
+      const s = stops[i], pose = lanePose(lane, s), end0 = i === 0, end1 = i === stops.length - 1;
+      const ring = {id: `${lane.id}:${i}`, type: 'ring', pos: pose.pos, q: lookQuat(pose.dir), radius: 50, useRange: 340, lane, s, minor: !end0 && !end1,
         name: end0 ? `Slingway to ${b.name}` : end1 ? `Slingway to ${a.name}` : 'Slingway ring'};
       lane.rings.push(ring); pois.push(ring); byId.set(ring.id, ring);
     }
     return lane;
-  });
+  }).filter(Boolean);
   const rocks = [];
   for (const zone of system.zones) {
     if (zone.kind !== 'rocks') continue;
     for (const rock of scatterRocks(zone, hashText(system.id + zone.name))) {
       if (pois.some(p => p.type !== 'ring' && dist(p.pos, rock.pos) < p.radius + rock.radius + 300)) continue;
-      if (lanes.some(l => segmentDistance(rock.pos, l.a, l.b) < rock.radius + 170)) continue;
+      if (lanes.some(l => l.points.some((p, i) => i && segmentDistance(rock.pos, l.points[i - 1], p) < rock.radius + 170))) continue;
       rocks.push(rock); const d = rock.radius * 1.44; solid(rock.pos, [d, d, d]);
     }
   }
@@ -374,13 +395,13 @@ export class World {
 
   #enterLane(ship, ring) {
     const lane = ring.lane, last = lane.rings.length - 1, index = lane.rings.indexOf(ring);
-    const dir = index === 0 ? 1 : index === last ? -1 : (dot3(this.forward(ship), lane.dir) >= 0 ? 1 : -1);
+    const dir = index === 0 ? 1 : index === last ? -1 : (dot3(this.forward(ship), lanePose(lane, ring.s).dir) >= 0 ? 1 : -1);
     ship.lane = {lane, dir, s: ring.s, v: Math.max(180, len(ship.body.velocity))};
     this.#dropCruise(ship); ship.drift = false;
     this.events.push({type: 'laneEnter'}); this.note(`Slingway engaged: ${dir > 0 ? lane.to.name : lane.from.name}.`);
   }
   #exitLane(ship, early = false) {
-    const {lane, dir} = ship.lane, d = lane.dir.map(v => v * dir);
+    const {lane, dir, s} = ship.lane, d = lanePose(lane, s).dir.map(v => v * dir);
     ship.body.velocity = d.map(v => v * (early ? 200 : 140)); ship.body.angularVelocity = [0, 0, 0];
     ship.throttle = 0.6; ship.lane = null;
     this.events.push({type: 'laneExit'});
@@ -667,8 +688,8 @@ export class World {
     const ride = ship.lane, {lane, dir} = ride, body = ship.body;
     ride.v = Math.min(LANE_SPEED, ride.v + 1100 * dt);
     ride.s += dir * ride.v * dt;
-    const d = lane.dir.map(v => v * dir);
-    body.position = addScaled(lane.a, lane.dir, clamp(ride.s, -160, lane.length + 160));
+    const pose = lanePose(lane, clamp(ride.s, -160, lane.length + 160)), d = pose.dir.map(v => v * dir);
+    body.position = pose.pos;
     body.velocity = d.map(v => v * ride.v); body.angularVelocity = [0, 0, 0];
     body.orientation = quatInterpolate(body.orientation, lookQuat(d), Math.min(1, dt * 5));
     if ((dir > 0 && ride.s >= lane.length + 150) || (dir < 0 && ride.s <= -150)) this.#exitLane(ship);
@@ -695,17 +716,31 @@ export class World {
     const obj = t.kind === 'signal' ? this.encounters.active && {pos: this.encounters.active.pos, radius: 250} : t.kind === 'ship' ? this.byId.get(t.id) : this.sector.byId.get(t.id);
     if (!obj || (obj.body && !obj.alive)) return this.stopAuto();
     if (ship.lane) return;
-    const pos = obj.body ? obj.body.position : obj.pos, to = sub(pos, ship.body.position), d = len(to);
+    const pos = obj.body ? obj.body.position : obj.pos, here = ship.body.position, d = dist(pos, here);
     const stop = auto.mode === 'use' ? obj.useRange * 0.7 : (obj.radius ?? 10) + (obj.body ? 140 : 260);
     if (auto.mode === 'use' && d <= obj.useRange * 0.97) { this.auto = null; this.target = {...t}; this.use(); return; }
     if (auto.mode === 'goto' && d <= stop) { this.auto = null; ship.throttle = 0; this.#dropCruise(ship); this.note('Autopilot: arrived.', 'good'); return; }
-    const dir = this.avoid(ship, to.map(v => v / d));
+    // Reuse a route until a moving target changes it; short segments and turn
+    // braking keep ordinary flight inside the clearance reserved by the planner.
+    if (!auto.route || dist(auto.route.at(-1), pos) > 200 ||
+      !hazardFreeApproach(this.system, here, auto.next === auto.route.length - 1 ? pos : auto.route[auto.next], 350 + ship.radius)) {
+      auto.route = hazardRoute(this.system, here, pos, 650 + ship.radius); auto.next = 1;
+    }
+    if (!auto.route) {
+      this.stopAuto(true); ship.throttle = 0; this.#dropCruise(ship); control.brake = true;
+      this.note('Autopilot: no safe approach. Move clear of the hazard and try again.', 'warn'); return;
+    }
+    while (auto.next < auto.route.length - 1 && dist(here, auto.route[auto.next]) < 120 &&
+      hazardFreeApproach(this.system, here, auto.route[auto.next + 1], 350 + ship.radius)) auto.next++;
+    const final = auto.next === auto.route.length - 1, waypoint = final ? pos : auto.route[auto.next];
+    const to = sub(waypoint, here), remaining = len(to) - (final ? stop : 0);
+    const dir = this.avoid(ship, normalize(to));
     control.turn = steerToward(ship, dir);
     const aligned = dot3(this.forward(ship), dir) > 0.97, speed = len(ship.body.velocity);
-    if (d - stop > 2600 && aligned && ship.cruise.state === 'off') { ship.cruise = {state: 'charging', t: 0}; this.events.push({type: 'cruise', state: 'charging'}); }
-    if (d - stop < 700 + speed * 2.4) this.#dropCruise(ship);
-    ship.throttle = clamp((d - stop) / 400, auto.mode === 'use' ? 0.6 : 0.2, 1); ship.drift = false;
-    control.brake = ship.cruise.state === 'off' && speed > ship.hull.speed * 1.25 && d - stop < 900;
+    if (remaining > 2600 && aligned && ship.cruise.state === 'off') { ship.cruise = {state: 'charging', t: 0}; this.events.push({type: 'cruise', state: 'charging'}); }
+    if (!aligned || remaining < 700 + speed * 2.4) this.#dropCruise(ship);
+    ship.throttle = aligned ? clamp(remaining / 400, auto.mode === 'use' ? 0.6 : 0.2, 1) : 0; ship.drift = false;
+    control.brake = !aligned || ship.cruise.state === 'off' && speed > ship.hull.speed * 1.25 && remaining < 900;
   }
 
   #stepMission(dt) {

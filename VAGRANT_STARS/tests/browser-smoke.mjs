@@ -3,7 +3,7 @@
 // project subpath exactly as GitHub Pages serves it. Needs Playwright: `npm run test:browser`.
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {rmSync} from 'node:fs';
+import {mkdirSync, rmSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import {join} from 'node:path';
 import {createStaticServer} from '../../scripts/serve.mjs';
@@ -98,6 +98,38 @@ try {
   await until('ship lost screen', s => s.mode === 'dead');
   await page.click('#btn-restore'); await page.waitForSelector('.st-shell');
   assert.match(await page.locator('.st-head h1').innerText(), /Tollard Station/);
+
+  // Regression: Calder's original straight slingway crossed the atmosphere.
+  // Exercise the rendered map, both directions, destination selection and F use.
+  await page.click('[data-act="launch"]'); await until('transit regression flight', s => s.mode === 'flight');
+  await page.evaluate(() => {
+    const w = __vagrant.world;
+    w.traffic = false; w.player.mission = null; w.enterSystem('meridian', {base: 'calder'});
+    const lane = w.sector.lanes.find(l => l.to.id === 'g-ostrava');
+    w.playerShip.body.position = [...lane.rings[0].pos]; w.targetPoi(lane.rings[0].id);
+    globalThis.transitHits = 0;
+    const damage = w.damage.bind(w);
+    w.damage = (ship, ...args) => { if (ship.isPlayer) globalThis.transitHits++; return damage(ship, ...args); };
+  });
+  await page.keyboard.press('KeyM'); await until('safe transit map', s => s.mode === 'map', 5);
+  mkdirSync(join(root, 'evidence/browser'), {recursive: true});
+  await page.screenshot({path: join(root, 'evidence/browser/VAGRANT_STARS-safe-transit-map.png')});
+  await page.keyboard.press('KeyM'); await until('safe transit flight', s => s.mode === 'flight', 5);
+  await page.keyboard.press('KeyF'); await until('Calder slingway', s => s.lane);
+  await until('Ostrava gate slingway exit', s => !s.lane);
+  assert.equal(await page.evaluate(() => __vagrant.world.target.id), 'g-ostrava');
+  await page.keyboard.press('KeyF'); await until('safe arrival in Ostrava', s => s.system === 'ostrava');
+  await page.evaluate(() => __vagrant.world.targetPoi('g-meridian'));
+  await page.keyboard.press('KeyF'); await until('return to Meridian', s => s.system === 'meridian');
+  await page.evaluate(() => {
+    const w = __vagrant.world, lane = w.sector.lanes.find(l => l.to.id === 'g-ostrava');
+    w.targetPoi(lane.rings.at(-1).id);
+  });
+  await page.keyboard.press('KeyF'); await until('return slingway', s => s.lane);
+  await until('Calder slingway exit', s => !s.lane);
+  assert.equal(await page.evaluate(() => __vagrant.world.target.id), 'calder');
+  await page.keyboard.press('KeyF'); await until('safe Calder docking', s => s.mode === 'docked' && s.docked === 'calder');
+  assert.equal(await page.evaluate(() => globalThis.transitHits), 0, 'the full gate round trip must not cause damage');
 
   assert.deepEqual(problems, []);
   console.log('browser smoke: PASS');

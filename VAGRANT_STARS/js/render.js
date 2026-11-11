@@ -211,7 +211,7 @@ export class Scene {
         this.#disc(poi.pos, 160, [0.25 * pulse, 0.55 * pulse, 1.0 * pulse], null, 20, 1.4);
         this.#disc(poi.pos, 60, [0.8, 0.9, 1], null, 12);
       } else {
-        this.#model(laneRingModel(), poi.pos, poi.lane.q, 1);
+        this.#model(laneRingModel(), poi.pos, poi.q, 1);
         this.#disc(poi.pos, 30, [0.15 * blink, 0.7 * blink, 0.9 * blink]);
       }
     }
