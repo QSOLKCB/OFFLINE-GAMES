@@ -182,16 +182,16 @@ export class World {
     }
     return best;
   }
-  /** Where the active contract points: {pos:[x,z], label}. */
+  /** Contract waypoint, or the free-roam signal when there is no contract. */
   waypoint() {
     const m = this.player.mission;
     if (!m) return this.encounters.waypoint();
     return m.kind === 'delivery' ? {pos: STATIONS[m.dest].pos, label: STATIONS[m.dest].name, station: m.dest} : {pos: m.pos, label: m.kind === 'defend' ? 'Distress beacon' : m.boss};
   }
-  /** The selected destination for warp and the HUD: a station or the contract marker. */
+  /** The selected destination for warp and the HUD: station, contract or shipping signal. */
   destination() {
     if (this.dest === 'signal') { const w = this.encounters.waypoint(); return w ? {...w, radius: 100} : null; }
-    if (this.dest === 'contract') { const w = this.waypoint(); return w ? {pos: w.pos, label: w.label, radius: 300} : null; }
+    if (this.dest === 'contract') { const w = this.player.mission && this.waypoint(); return w ? {pos: w.pos, label: w.label, radius: 300} : null; }
     const s = this.dest ? this.sector.byId.get(this.dest) : null;
     return s ? {pos: s.xz, label: s.name, radius: s.radius, station: s} : null;
   }
@@ -257,7 +257,7 @@ export class World {
   syncPlayer() { const p = this.player, s = this.playerShip; p.hp = Math.max(1, Math.ceil(s.hp)); p.torps = s.torps; }
 
   // Simulation -------------------------------------------------------------------------------
-  /** cmd: {rudder:-1..1 (+ = port), throttle:-1..1, boost, deflect, hold, aim:[x,z], torpedo} */
+  /** cmd: {rudder:-1..1 (+ = port), throttle:-1..1, boost, brake, deflect, hold, aim:[x,z], torpedo} */
   step(dt, cmd = {}) {
     if (this.over || this.docked) return;
     this.time += dt; this.player.time += dt;
@@ -292,14 +292,19 @@ export class World {
     const w = ship.warp;
     if (w.state === 'off') return;
     const dest = this.destination(), p = ship.body.position;
+    let aligned = true;
     if (dest) {
       const dx = dest.pos[0] - p[0], dz = dest.pos[1] - p[2], d = Math.hypot(dx, dz);
       if (d < dest.radius + 1300) return this.#dropWarp(`Dropped out of warp off ${dest.label}.`, 'good');
-      if (!cmd.rudder) ctl.rudder = clamp(this.bearingTo(ship, this.avoid(ship, [dx / d, dz / d])) * 3, -1, 1);
+      if (!cmd.rudder) {
+        const bearing = this.bearingTo(ship, this.avoid(ship, [dx / d, dz / d]));
+        ctl.rudder = clamp(bearing * 3, -1, 1); aligned = Math.abs(bearing) < 0.12;
+      }
     }
     if (w.state === 'spool') {
-      w.t += dt; ship.throttle = Math.max(ship.throttle, 0.4);
-      if (w.t >= WARP_SPOOL) { w.state = 'on'; this.events.push({type: 'warp', state: 'on'}); }
+      w.t = Math.min(WARP_SPOOL, w.t + dt); ship.throttle = Math.max(ship.throttle, 0.4);
+      // A nearby signal can be astern. Turning at normal speed avoids a wide warp-speed orbit.
+      if (w.t >= WARP_SPOOL && aligned) { w.state = 'on'; this.events.push({type: 'warp', state: 'on'}); }
       return;
     }
     if (this.nearestHostile(1500)) return this.#dropWarp('Interdicted! Hostiles have pulled you out of warp.', 'warn');

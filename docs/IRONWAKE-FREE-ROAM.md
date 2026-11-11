@@ -10,6 +10,9 @@ With no active contract, ordinary flight opens a nearby signal after ten seconds
 The HUD, radar and sector chart mark it, followed by a seven-second arrival warning.
 **V** or right-stick click plots the signal; **J** or RB/R1 engages warp toward it.
 On the chart, click the beacon or use the controller's course selector.
+Automatic warp steering aligns the bow before accelerating, so nearby courses
+off either beam or astern do not launch the ship into a wide warp-speed orbit.
+Manual rudder input still overrides automatic steering.
 
 | Stage | Encounter | Bonus, in addition to bounties and salvage |
 | --- | --- | --- |

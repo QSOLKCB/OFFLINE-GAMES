@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {World, SENSOR, forward2, headingOf} from '../js/sim/world.js';
+import {World, SENSOR, forward2, headingOf, yawQuat} from '../js/sim/world.js';
 import {newPlayer, sanitizeSave} from '../js/sim/player.js';
 import {SQUADRONS} from '../js/sim/data.js';
 import {AMBIENT_LIMIT, ENCOUNTER_RESERVE, MAX_AMBIENT_GROUP, FORMATION_RADIUS, clearSignalApproach} from '../js/sim/encounters.js';
@@ -123,6 +123,36 @@ test('beacons keep the full rescue formation out of solids and reject obstructed
   const blocked = new World(newPlayer()); blocked.sector.grid.query = () => [{box: solid.box}];
   blocked.encounters.step(20); assert.equal(blocked.encounters.active, null);
   assert.match(blocked.encounters.status, /debris/);
+});
+
+test('completed contract courses cannot silently become new shipping-signal courses', () => {
+  const w = new World(newPlayer());
+  w.player.mission = {kind: 'delivery', dest: 'tinder'}; w.selectDest('contract');
+  assert.equal(w.destination().label, 'Tinder Works');
+  w.player.mission = null; w.encounters.active = {pos: [6000, 6000], title: 'New signal'};
+  assert.equal(w.destination(), null);
+  w.cycleDest(); assert.equal(w.dest, 'signal'); assert.equal(w.destination().signal, true);
+  w.cycleDest(-1); assert.ok(w.destination().station);
+  w.cycleDest(); assert.equal(w.dest, 'signal');
+  w.selectDest('contract'); assert.equal(w.dest, 'signal', 'a missing contract cannot be selected');
+});
+
+test('warp aligns before accelerating toward nearby beam or astern signals', () => {
+  for (const angle of [Math.PI / 2, Math.PI, -Math.PI / 2]) {
+    const w = new World(newPlayer(), {traffic: false}); w.traffic = true; w.spawnT = Infinity;
+    const me = w.playerShip, pos = [5000 + Math.sin(angle) * 1800, 5000 - Math.cos(angle) * 1800];
+    me.body.position = [5000, 0, 5000]; me.body.orientation = yawQuat(0);
+    w.encounters.active = {stage: 0, title: 'Nearby signal', pos, warning: 7, ttl: 300, enemies: null, wards: [], reward: 0};
+    const e = w.encounters.active; w.targetSignal(); w.toggleWarp();
+    let peak = 0;
+    for (let i = 0; i < 1800 && me.warp.state !== 'off'; i++) {
+      w.step(1 / 60); w.events.length = 0;
+      peak = Math.max(peak, Math.hypot(me.body.position[0] - pos[0], me.body.position[2] - pos[1]));
+    }
+    assert.equal(me.warp.state, 'off'); assert.equal(w.encounters.active, e);
+    assert.ok(peak < 2200, `approach strayed ${peak} units`);
+    assert.ok(Math.hypot(me.body.position[0] - pos[0], me.body.position[2] - pos[1]) < 1700);
+  }
 });
 
 test('ambient and warp insertion share a reserved budget; ten-minute free roam remains bounded', () => {

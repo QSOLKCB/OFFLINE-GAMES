@@ -114,7 +114,7 @@ export function drawHud(ctx, w, h, world, scene, ui) {
   bar(ctx, bx + 258, by + 32, 130, 15, me.deflect.charge, me.deflect.active ? 'rgba(110,255,230,.95)' : 'rgba(60,170,160,.85)', 'DEFLECTOR', me.deflect.active ? 'UP' : '');
   bar(ctx, bx + 12, by + 52, 130, 15, me.throttle, 'rgba(110,170,255,.85)', 'THROTTLE', `${Math.round(speed)} m/s`);
   bar(ctx, bx + 258, by + 52, 130, 15, me.boost, 'rgba(255,170,80,.85)', 'BOOST', '');
-  const mode = me.warp.state === 'on' ? 'WARP' : me.warp.state === 'spool' ? `WARP SPOOLING ${Math.round(me.warp.t / WARP_SPOOL * 100)}%` : me.boosting ? 'BOOSTING' : me.deflect.active ? 'DEFLECTOR UP' : '';
+  const mode = me.warp.state === 'on' ? 'WARP' : me.warp.state === 'spool' ? (me.warp.t >= WARP_SPOOL ? 'ALIGNING FOR WARP' : `WARP SPOOLING ${Math.round(me.warp.t / WARP_SPOOL * 100)}%`) : me.boosting ? 'BOOSTING' : me.deflect.active ? 'DEFLECTOR UP' : '';
   label(ctx, mode || `${me.geometry ? HULLS[p.hull].name : ''}-class ${HULLS[p.hull].cls}`, cx, by + 92, mode ? '#8fd8ff' : C.dim, 11, 'center', '600');
   label(ctx, `[${ui.controller ? 'X / Square' : 'Q'}] Torpedoes ${me.torps}`, bx + 12, by + 88, C.neutral, 11, 'left'); label(ctx, `${me.turrets.length} turrets: auto`, bx + 388, by + 88, C.dim, 11, 'right');
 
