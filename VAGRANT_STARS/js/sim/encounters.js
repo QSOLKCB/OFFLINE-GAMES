@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 // Free-roam signals are separate from contracts. All clocks use simulation time.
 import {rotate, seededRandom} from '../../vendor/vanillajs/modules/math/index.js';
+import {hazardFreeApproach} from './hazards.js';
 
 export const AMBIENT_LIMIT = 18, ENCOUNTER_RESERVE = 4;
+const FORMATION_CLEARANCE = 650;
 export const ARCS = {
   flight: ['Raiders on the trade lane', 'Mayday from a stranded freighter', 'Reaver flight leader'],
 };
@@ -49,8 +51,10 @@ export class EncounterDirector {
       const a = start + i * Math.PI / 8, r = 1800 + Math.floor(i / 8) * 700;
       const pos = [me.body.position[0] + Math.cos(a) * r, me.body.position[1], me.body.position[2] + Math.sin(a) * r];
       if (ports.some(p => distance(pos, p.pos) < p.radius + 1500)) continue;
-      // Include the full formation footprint, not just the lead ship.
-      if (w.sector.grid.query(pos, 650).some(s => !s.dead)) continue;
+      // Planets and stellar heat are not in the static collision grid. Sweep the
+      // formation along the approach too: a safe endpoint can be across a planet.
+      if (!hazardFreeApproach(w.system, me.body.position, pos, FORMATION_CLEARANCE)) continue;
+      if (w.sector.grid.query(pos, FORMATION_CLEARANCE).some(s => !s.dead)) continue;
       return pos;
     }
     return null;
@@ -93,7 +97,7 @@ export class EncounterDirector {
     }
     if (hostiles > 2 || population > AMBIENT_LIMIT) { this.status = 'Local combat — clear the area'; return; }
     const pos = this.#beacon();
-    if (!pos) { this.status = 'Leave the port approach to find signals'; return; }
+    if (!pos) { this.status = 'Leave the port or hazard approach to find signals'; return; }
     this.active = {stage: this.stage, title: this.titles[this.stage], pos, warning: 6, ttl: 240, enemies: null, wards: [], reward: 0};
     w.say('Reach traffic control', `${this.active.title}. Beacon marked; contacts arriving in six seconds.`, 'warn');
   }

@@ -7,6 +7,9 @@ This pass develops the Freelancer-inspired game. IRONWAKE remains for a separate
 Without a contract, traffic control announces a nearby signal after eight seconds
 of ordinary flight, followed by a six-second warning before the formation arrives.
 The beacon is fixed in space, 1.8–2.5 km away, clear of port approaches and solids.
+Its straight approach also keeps the entire 650-unit formation footprint outside
+planetary atmospheres and stellar heat. If no candidate is safe, signals wait until
+the pilot leaves the hazard or port approach.
 It appears on the HUD and map. **V** (controller right-stick click) selects it;
 **F / A / Cross** approaches it. **R / Y / Triangle** selects the nearest enemy.
 
@@ -109,3 +112,5 @@ suite feeds synthetic standard Gamepad API samples into the real application and
 writes its receipt and screenshot under `evidence/browser/` for CI artifacts.
 The simulation suite covers 16 initial seeds, a ten-minute bounded replay, rewards,
 rescue loss, nonparticipation, controller lifecycle, and docking in both directions.
+Hazard regressions cover the reported Calder autopilot approach without invulnerability,
+formation clearance at every planet, obstructed routes, and exact hazard boundaries.

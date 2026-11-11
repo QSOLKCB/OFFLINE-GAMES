@@ -11,6 +11,7 @@ import {shipModel, stationBoxes, STATION_RADIUS, scatterRocks} from './models.js
 import {cargoFree, adjustRep, levelOf} from './player.js';
 import {completeMission, missionOnDock} from './missions.js';
 import {EncounterDirector, AMBIENT_LIMIT, nearestHostile} from './encounters.js';
+import {ATMOSPHERE_SCALE, STELLAR_HEAT_SCALE} from './hazards.js';
 import {thinkNpc, steerToward} from './ai.js';
 
 export const CRUISE_CHARGE = 3.5, BOOST_TIME = 5, BOOST_RECHARGE = 9, LANE_SPEED = 2600, SENSOR = 6000, JUMP_TIME = 1.7;
@@ -723,14 +724,14 @@ export class World {
   #hazards(dt) {
     const ship = this.playerShip, pos = ship.body.position, star = this.system.star, d = dist(pos, star.pos);
     this.hazardT -= dt;
-    if (d < star.radius * 1.7) {
-      this.damage(ship, 90 * dt * (1.7 - d / star.radius) * 3, 140 * dt, null);
+    if (d < star.radius * STELLAR_HEAT_SCALE) {
+      this.damage(ship, 90 * dt * (STELLAR_HEAT_SCALE - d / star.radius) * 3, 140 * dt, null);
       if (this.hazardT <= 0) { this.hazardT = 4; this.note('Hull temperature critical. Pull away from the star!', 'warn'); }
     }
     for (const planet of this.system.planets) {
       const to = sub(pos, planet.pos), r = len(to);
-      if (r > planet.radius * 1.03) continue;
-      ship.body.position = addScaled(planet.pos, to.map(v => v / r), planet.radius * 1.03);
+      if (r > planet.radius * ATMOSPHERE_SCALE) continue;
+      ship.body.position = addScaled(planet.pos, to.map(v => v / r), planet.radius * ATMOSPHERE_SCALE);
       this.#dropCruise(ship); if (ship.lane) this.#exitLane(ship, true);
       this.damage(ship, 160 * dt, 240 * dt, null);
       if (this.hazardT <= 0) { this.hazardT = 4; this.note('Atmospheric burn! Climb out!', 'warn'); }
